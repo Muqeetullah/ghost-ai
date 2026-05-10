@@ -8,11 +8,13 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Install and configure shadcn/ui design-system primitives for the dark Ghost AI workspace.
+- Await the next scoped editor feature from the project context.
 
 ## Completed
 
 - Design system and UI primitives setup from `context/feature-specs/01-design-system.md`.
+- Editor chrome components from `context/feature-specs/02-editor.md`: navbar, floating project sidebar shell, and dialog content pattern.
+- Editor screen composition mounting the navbar and project sidebar on `/`.
 
 ## In Progress
 
@@ -20,7 +22,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Begin the next scoped foundation feature from the project context.
+- Begin the next scoped editor feature from the project context.
 
 ## Open Questions
 
@@ -36,3 +38,6 @@ Update this file whenever the current phase, active feature, or implementation s
 - 2026-05-11: Confirmed design-system foundation remains in progress before implementation verification.
 - 2026-05-11: Completed design-system foundation setup. Verified shadcn primitives, `lucide-react`, shared `cn()`, and dark Ghost AI theme tokens with lint and production build.
 - 2026-05-11: Added root `.gitignore` with baseline Next.js/Node ignores for dependencies, build artifacts, logs, env files, and OS/editor noise.
+- 2026-05-11: Started editor chrome implementation from `context/feature-specs/02-editor.md`.
+- 2026-05-11: Completed editor chrome components. Added reusable navbar/sidebar shells and dialog content pattern, then verified with lint and production build.
+- 2026-05-11: Mounted the editor navbar and floating project sidebar on `/` using a small client screen shell. Verified with lint and production build.
