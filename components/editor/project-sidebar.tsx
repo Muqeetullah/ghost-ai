@@ -30,6 +30,7 @@ export function ProjectSidebar({
   return (
     <aside
       aria-hidden={!isOpen}
+      inert={!isOpen}
       className={cn(
         "fixed top-[4.5rem] bottom-4 left-4 z-40 flex w-[min(22rem,calc(100vw-2rem))] flex-col rounded-2xl border border-surface-border bg-sidebar p-4 shadow-2xl backdrop-blur-xl transition-transform duration-200 ease-out",
         isOpen ? "translate-x-0" : "-translate-x-[calc(100%+2rem)]",

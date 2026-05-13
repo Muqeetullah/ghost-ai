@@ -41,3 +41,4 @@ Update this file whenever the current phase, active feature, or implementation s
 - 2026-05-11: Started editor chrome implementation from `context/feature-specs/02-editor.md`.
 - 2026-05-11: Completed editor chrome components. Added reusable navbar/sidebar shells and dialog content pattern, then verified with lint and production build.
 - 2026-05-11: Mounted the editor navbar and floating project sidebar on `/` using a small client screen shell. Verified with lint and production build.
+- 2026-05-14: Closed `ProjectSidebar` removes descendants from the focus order via `inert={!isOpen}` alongside existing `aria-hidden` and transform. Verified with lint and `tsc --noEmit`.
