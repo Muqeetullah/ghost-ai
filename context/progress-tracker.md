@@ -19,6 +19,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Authentication page UI polish for sign-in and sign-up screens.
 - Authenticated user menu positioning and account modal backdrop opacity fix.
 - Clerk protected-route redirects now use the embedded local auth pages.
+- Project dialogs and editor home from `context/feature-specs/04-project-dialogs.md`: mock project lists, owned-project actions, create/rename/delete dialogs, live slug preview, and mobile sidebar scrim.
+- Current issue fix for project creation: created mock projects now appear in the sidebar, and invalid special characters block submission instead of being silently stripped from the slug preview.
 
 ## In Progress
 
@@ -38,6 +40,10 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Session Notes
 
+- 2026-05-14: Started current issue fix for project creation sidebar updates and invalid project name validation.
+- 2026-05-14: Completed current issue fix for project creation sidebar updates and invalid name validation. Moved mock projects into editor state, wired create/rename/delete mutations, added name validation, blocked invalid submits, and verified with lint, `tsc --noEmit`, and production build.
+- 2026-05-14: Started project dialogs and editor home implementation from `context/feature-specs/04-project-dialogs.md`.
+- 2026-05-14: Completed project dialogs and editor home implementation. Added mock owned/shared project data, wired create/rename/delete dialog flows through a dedicated hook, added live slug preview, and added the mobile sidebar scrim. Verified with lint, `tsc --noEmit`, and production build; in-app browser verification was blocked by the client for localhost.
 - 2026-05-11: Started design-system foundation setup. Scope is shadcn/ui configuration, specified primitives, lucide-react, and shared `cn()` utility.
 - 2026-05-11: Confirmed design-system foundation remains in progress before implementation verification.
 - 2026-05-11: Completed design-system foundation setup. Verified shadcn primitives, `lucide-react`, shared `cn()`, and dark Ghost AI theme tokens with lint and production build.
