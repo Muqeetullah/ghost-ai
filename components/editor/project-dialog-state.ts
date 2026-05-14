@@ -93,28 +93,30 @@ export function useProjectDialogs() {
     onSubmit?: (
       value: ProjectDialogSubmitValue | undefined,
       dialog: ProjectDialogState
-    ) => void
+    ) => void | Promise<void>
   ) {
     if (!canSubmit) {
       return
     }
 
     setIsLoading(true)
-    window.setTimeout(() => {
-      if (dialog) {
-        const submitValue =
-          dialog.type === "delete"
-            ? undefined
-            : {
-                name: projectName.trim(),
-                slug: slugPreview,
-              }
+    window.setTimeout(async () => {
+      try {
+        if (dialog) {
+          const submitValue =
+            dialog.type === "delete"
+              ? undefined
+              : {
+                  name: projectName.trim(),
+                  slug: slugPreview,
+                }
 
-        onSubmit?.(submitValue, dialog)
+          await onSubmit?.(submitValue, dialog)
+        }
+      } finally {
+        setIsLoading(false)
+        setDialog(null)
       }
-
-      setIsLoading(false)
-      setDialog(null)
     }, 250)
   }
 

@@ -6,7 +6,7 @@ Build the `/editor` home screen and add project dialogs/sidebar actions. No API 
 
 ## Editor Home
 
-Reuse the existing editor layout. Do not modify the navbar or sidebar behavior.
+Reuse the existing editor layout. Keep navbar behavior unchanged, and limit sidebar behavior changes to the scoped project actions and mobile close/backdrop behavior listed in this spec.
 
 In the center of the page, add:
 
@@ -20,20 +20,20 @@ Clicking `New Project` should open the Create Project dialog.
 
 ## Dialogs
 
-### Create Project
+### Create Project (editor home and sidebar create)
 
 - project name input
 - live slug preview based on the name
 - preview updates as the user types
 
-### Rename Project
+### Rename Project (owned-project sidebar action)
 
 - prefilled project name input
 - current project name shown in the description
 - input auto-focuses
 - Enter submits
 
-### Delete Project
+### Delete Project (owned-project sidebar action)
 
 - destructive confirmation only
 - no input

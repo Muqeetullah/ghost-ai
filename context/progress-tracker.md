@@ -21,6 +21,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Clerk protected-route redirects now use the embedded local auth pages.
 - Project dialogs and editor home from `context/feature-specs/04-project-dialogs.md`: mock project lists, owned-project actions, create/rename/delete dialogs, live slug preview, and mobile sidebar scrim.
 - Current issue fix for project creation: created mock projects now appear in the sidebar, and invalid special characters block submission instead of being silently stripped from the slug preview.
+- Verified review fixes: current issue notes untracked while ignored locally, project dialog submit cleanup is guaranteed with async try/finally, and the project dialog spec now explicitly permits scoped sidebar changes.
 
 ## In Progress
 
@@ -40,6 +41,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Session Notes
 
+- 2026-05-14: Started verified review fixes for untracking current issue notes, hardening project dialog submit cleanup, and resolving project dialog spec wording.
+- 2026-05-14: Completed verified review fixes. Confirmed all three findings were valid, untracked local current issue notes while preserving the `.gitignore` entry, hardened project dialog submit cleanup with async `try/finally`, resolved the project dialog spec sidebar wording conflict, and verified with lint, `tsc --noEmit`, and production build.
 - 2026-05-14: Started current issue fix for project creation sidebar updates and invalid project name validation.
 - 2026-05-14: Completed current issue fix for project creation sidebar updates and invalid name validation. Moved mock projects into editor state, wired create/rename/delete mutations, added name validation, blocked invalid submits, and verified with lint, `tsc --noEmit`, and production build.
 - 2026-05-14: Started project dialogs and editor home implementation from `context/feature-specs/04-project-dialogs.md`.
