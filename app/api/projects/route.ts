@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 import {
@@ -42,28 +43,23 @@ export async function POST(request: Request) {
     return body;
   }
 
-  if (body.id) {
-    const existingProject = await prisma.project.findUnique({
-      where: {
+  let project;
+
+  try {
+    project = await prisma.project.create({
+      data: {
         id: body.id,
-      },
-      select: {
-        id: true,
+        ownerId: authResult.userId,
+        name: body.name,
       },
     });
-
-    if (existingProject) {
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return Response.json({ error: "Project ID already exists" }, { status: 409 });
     }
-  }
 
-  const project = await prisma.project.create({
-    data: {
-      id: body.id,
-      ownerId: authResult.userId,
-      name: body.name,
-    },
-  });
+    throw error;
+  }
 
   return Response.json({ project: serializeProject(project) }, { status: 201 });
 }

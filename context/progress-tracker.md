@@ -44,6 +44,9 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Session Notes
 
+- 2026-05-14: Limited shared-project collaborator lookups to verified Clerk email addresses only.
+- 2026-05-14: Updated editor project list unauthenticated redirects to use `NEXT_PUBLIC_CLERK_SIGN_IN_URL` with `/sign-in` fallback.
+- 2026-05-14: Fixed project creation duplicate ID handling by removing the non-atomic pre-check and mapping Prisma `P2002` create failures to `409`.
 - 2026-05-14: Fixed Prisma Accelerate URL detection so both `prisma://` and `prisma+postgres://` database URLs use the Accelerate client path instead of the direct Postgres adapter.
 - 2026-05-14: Completed editor home real project API wiring. Added server-side project list loading, moved project mutations into `hooks/use-project-actions.ts`, wired sidebar rows to `/editor/[projectId]`, added room ID creation aligned to project IDs, and verified with lint, `tsc --noEmit`, and production build.
 - 2026-05-14: Started editor home real project API wiring from `context/feature-specs/07-wire-editor-home.md`.

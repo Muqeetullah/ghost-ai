@@ -8,17 +8,20 @@ import { prisma } from "@/lib/prisma";
 import type { EditorProject, EditorProjectLists } from "@/types/projects";
 
 type ProjectSummary = Pick<Project, "id" | "name" | "updatedAt">;
+const signInUrl = process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? "/sign-in";
 
 export async function getEditorProjectLists(): Promise<EditorProjectLists> {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect("/sign-in");
+    redirect(signInUrl);
   }
 
   const user = await currentUser();
   const collaboratorEmails =
-    user?.emailAddresses.map((email) => email.emailAddress.toLowerCase()) ?? [];
+    user?.emailAddresses
+      .filter((email) => email.verification?.status === "verified")
+      .map((email) => email.emailAddress.toLowerCase()) ?? [];
 
   const [ownedProjects, sharedProjects] = await Promise.all([
     prisma.project.findMany({
