@@ -12,12 +12,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import type { MockProject } from "@/components/editor/project-dialog-state"
+import type { EditorProject } from "@/types/projects"
 
 type ActiveDialog =
-  | { type: "create"; project?: MockProject }
-  | { type: "rename"; project?: MockProject }
-  | { type: "delete"; project?: MockProject }
+  | { type: "create"; project?: EditorProject }
+  | { type: "rename"; project?: EditorProject }
+  | { type: "delete"; project?: EditorProject }
   | null
 
 interface ProjectDialogsProps {
@@ -27,6 +27,7 @@ interface ProjectDialogsProps {
   slugPreview: string
   canSubmit: boolean
   isLoading: boolean
+  formError: string | null
   onProjectNameChange: (value: string) => void
   onOpenChange: (isOpen: boolean) => void
   onSubmit: () => void
@@ -39,6 +40,7 @@ export function ProjectDialogs({
   slugPreview,
   canSubmit,
   isLoading,
+  formError,
   onProjectNameChange,
   onOpenChange,
   onSubmit,
@@ -101,7 +103,7 @@ export function ProjectDialogs({
 
               <div className="rounded-xl border border-surface-border bg-bg-subtle/70 px-3 py-2">
                 <p className="text-xs font-medium uppercase text-copy-faint">
-                  Slug preview
+                  Room ID preview
                 </p>
                 <p
                   className={
@@ -115,6 +117,10 @@ export function ProjectDialogs({
                     : slugPreview}
                 </p>
               </div>
+
+              {formError ? (
+                <p className="text-sm text-state-error">{formError}</p>
+              ) : null}
             </div>
 
             <DialogFooter className="rounded-none border-surface-border bg-bg-subtle/50 p-6">
@@ -136,7 +142,7 @@ export function ProjectDialogs({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="px-6 pb-6">
+            <div className="space-y-4 px-6 pb-6">
               <label className="block space-y-2">
                 <span className="text-sm font-medium text-copy-secondary">
                   Project name
@@ -162,6 +168,10 @@ export function ProjectDialogs({
                   </span>
                 ) : null}
               </label>
+
+              {formError ? (
+                <p className="text-sm text-state-error">{formError}</p>
+              ) : null}
             </div>
 
             <DialogFooter className="rounded-none border-surface-border bg-bg-subtle/50 p-6">
@@ -183,6 +193,12 @@ export function ProjectDialogs({
                 undone.
               </DialogDescription>
             </DialogHeader>
+
+            {formError ? (
+              <div className="px-6 pb-6">
+                <p className="text-sm text-state-error">{formError}</p>
+              </div>
+            ) : null}
 
             <DialogFooter className="rounded-none border-surface-border bg-bg-subtle/50 p-6">
               <Button type="submit" variant="destructive" disabled={isLoading}>

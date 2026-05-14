@@ -20,6 +20,9 @@ pnpm-debug.log*
 # testing
 coverage/
 
+# typescript
+tsconfig.tsbuildinfo
+
 # local env files
 .env
 .env.local

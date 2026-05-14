@@ -1,20 +1,22 @@
 "use client"
 
+import Link from "next/link"
 import { Pencil, Plus, Trash2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { MockProject } from "@/components/editor/project-dialog-state"
 import { cn } from "@/lib/utils"
+import type { EditorProject } from "@/types/projects"
 
 interface ProjectSidebarProps {
   isOpen: boolean
   onClose: () => void
-  ownedProjects: MockProject[]
-  sharedProjects: MockProject[]
+  ownedProjects: EditorProject[]
+  sharedProjects: EditorProject[]
+  activeProjectId?: string
   onCreateProject: () => void
-  onRenameProject: (project: MockProject) => void
-  onDeleteProject: (project: MockProject) => void
+  onRenameProject: (project: EditorProject) => void
+  onDeleteProject: (project: EditorProject) => void
   className?: string
 }
 
@@ -29,15 +31,17 @@ function EmptyProjectState() {
 }
 
 interface ProjectListProps {
-  projects: MockProject[]
+  projects: EditorProject[]
   canManage: boolean
-  onRenameProject: (project: MockProject) => void
-  onDeleteProject: (project: MockProject) => void
+  activeProjectId?: string
+  onRenameProject: (project: EditorProject) => void
+  onDeleteProject: (project: EditorProject) => void
 }
 
 function ProjectList({
   projects,
   canManage,
+  activeProjectId,
   onRenameProject,
   onDeleteProject,
 }: ProjectListProps) {
@@ -50,9 +54,12 @@ function ProjectList({
       {projects.map((project) => (
         <div
           key={project.id}
-          className="group flex items-center gap-3 rounded-xl border border-surface-border bg-bg-subtle/45 p-3 transition-colors hover:border-surface-border-subtle hover:bg-bg-subtle"
+          className={cn(
+            "group flex items-center gap-3 rounded-xl border border-surface-border bg-bg-subtle/45 p-3 transition-colors hover:border-surface-border-subtle hover:bg-bg-subtle",
+            activeProjectId === project.id && "border-surface-border-subtle bg-accent-dim"
+          )}
         >
-          <div className="min-w-0 flex-1">
+          <Link href={`/editor/${project.id}`} className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-copy-primary">
               {project.name}
             </p>
@@ -60,7 +67,7 @@ function ProjectList({
               /{project.slug}
             </p>
             <p className="mt-2 text-xs text-copy-faint">{project.updatedAt}</p>
-          </div>
+          </Link>
 
           {canManage ? (
             <div className="flex shrink-0 items-center gap-1 opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-focus-within:opacity-100">
@@ -97,6 +104,7 @@ export function ProjectSidebar({
   onClose,
   ownedProjects,
   sharedProjects,
+  activeProjectId,
   onCreateProject,
   onRenameProject,
   onDeleteProject,
@@ -145,6 +153,7 @@ export function ProjectSidebar({
             <ProjectList
               projects={ownedProjects}
               canManage
+              activeProjectId={activeProjectId}
               onRenameProject={onRenameProject}
               onDeleteProject={onDeleteProject}
             />
@@ -153,6 +162,7 @@ export function ProjectSidebar({
             <ProjectList
               projects={sharedProjects}
               canManage={false}
+              activeProjectId={activeProjectId}
               onRenameProject={onRenameProject}
               onDeleteProject={onDeleteProject}
             />
