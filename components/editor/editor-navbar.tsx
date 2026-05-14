@@ -1,7 +1,10 @@
 "use client"
 
 import type { ReactNode } from "react"
+import { UserButton } from "@clerk/nextjs"
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
+
+import { clerkUserButtonAppearance } from "@/lib/clerk-appearance"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -47,7 +50,12 @@ export function EditorNavbar({
         {centerContent}
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center justify-end" />
+      <div className="flex min-w-0 flex-1 items-center justify-end">
+        <UserButton
+          appearance={clerkUserButtonAppearance}
+          userProfileMode="modal"
+        />
+      </div>
     </header>
   )
 }

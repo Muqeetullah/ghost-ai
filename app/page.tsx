@@ -1,5 +1,8 @@
-import { EditorScreen } from "@/components/editor/editor-screen";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return <EditorScreen />;
+export default async function Home() {
+  const { userId } = await auth();
+
+  redirect(userId ? "/editor" : "/sign-in");
 }
