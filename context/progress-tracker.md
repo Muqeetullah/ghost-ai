@@ -23,6 +23,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Current issue fix for project creation: created mock projects now appear in the sidebar, and invalid special characters block submission instead of being silently stripped from the slug preview.
 - Verified review fixes: current issue notes untracked while ignored locally, project dialog submit cleanup is guaranteed with async try/finally, and the project dialog spec now explicitly permits scoped sidebar changes.
 - Prisma schema and data layer from `context/feature-specs/05-prisma.md`: Project and ProjectCollaborator models, Prisma schema folder setup, cached Prisma singleton with Prisma Postgres/direct Postgres branching, generated client, and applied migration.
+- Backend project API routes from `context/feature-specs/06-project-apis.md`: list/create owned projects, rename/delete with owner checks, route-level `401` and `403` responses, and project route proxy handoff.
+- Editor home real project API wiring from `context/feature-specs/07-wire-editor-home.md`: server-loaded owned/shared project lists, real create/rename/delete mutations, room ID preview, workspace navigation, active workspace route, and delete redirect/refresh behavior.
 
 ## In Progress
 
@@ -42,6 +44,11 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Session Notes
 
+- 2026-05-14: Fixed Prisma Accelerate URL detection so both `prisma://` and `prisma+postgres://` database URLs use the Accelerate client path instead of the direct Postgres adapter.
+- 2026-05-14: Completed editor home real project API wiring. Added server-side project list loading, moved project mutations into `hooks/use-project-actions.ts`, wired sidebar rows to `/editor/[projectId]`, added room ID creation aligned to project IDs, and verified with lint, `tsc --noEmit`, and production build.
+- 2026-05-14: Started editor home real project API wiring from `context/feature-specs/07-wire-editor-home.md`.
+- 2026-05-14: Completed backend project API route implementation. Added REST handlers for list/create/rename/delete, used Clerk user IDs as project owners, enforced owner-only rename/delete, allowed project API routes to return route-level `401` JSON, and verified with lint, `tsc --noEmit`, and production build.
+- 2026-05-14: Started backend project API route implementation from `context/feature-specs/06-project-apis.md`.
 - 2026-05-14: Started verified review fixes for untracking current issue notes, hardening project dialog submit cleanup, and resolving project dialog spec wording.
 - 2026-05-14: Completed verified review fixes. Confirmed all three findings were valid, untracked local current issue notes while preserving the `.gitignore` entry, hardened project dialog submit cleanup with async `try/finally`, resolved the project dialog spec sidebar wording conflict, and verified with lint, `tsc --noEmit`, and production build.
 - 2026-05-14: Started current issue fix for project creation sidebar updates and invalid project name validation.

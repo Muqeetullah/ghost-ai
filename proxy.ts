@@ -9,10 +9,11 @@ const isPublicRoute = createRouteMatcher([
   `${signInPath}(.*)`,
   `${signUpPath}(.*)`,
 ])
+const hasRouteHandlerAuth = createRouteMatcher(["/api/projects(.*)"])
 
 export const proxy = clerkMiddleware(
   async (auth, request) => {
-    if (!isPublicRoute(request)) {
+    if (!isPublicRoute(request) && !hasRouteHandlerAuth(request)) {
       await auth.protect()
     }
   },

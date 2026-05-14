@@ -1,4 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import { withAccelerate } from "@prisma/extension-accelerate";
 import { PrismaClient } from "@/generated/prisma/client";
 
 const connectionString = process.env.DATABASE_URL;
@@ -8,21 +9,25 @@ if (!connectionString) {
 }
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient;
+  prisma?: ReturnType<typeof createPrismaClient>;
 };
 
 function createPrismaClient(databaseUrl: string) {
-  if (databaseUrl.startsWith("prisma+postgres://")) {
+  if (isAccelerateUrl(databaseUrl)) {
     return new PrismaClient({
       accelerateUrl: databaseUrl,
-    });
+    }).$extends(withAccelerate());
   }
 
   const adapter = new PrismaPg({ connectionString: databaseUrl });
 
   return new PrismaClient({
     adapter,
-  });
+  }).$extends(withAccelerate());
+}
+
+function isAccelerateUrl(databaseUrl: string) {
+  return databaseUrl.startsWith("prisma://") || databaseUrl.startsWith("prisma+postgres://");
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient(connectionString);
