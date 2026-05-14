@@ -80,6 +80,7 @@
     --accent-primary-dim: rgba(0, 200, 212, 0.12);
     --accent-ai: #6457f9;
     --accent-ai-text: #8b82ff;
+    --overlay-backdrop: rgba(8, 8, 9, 0.46);
     --state-error: #ff4d4f;
     --state-success: #34d399;
     --state-warning: #fbbf24;
