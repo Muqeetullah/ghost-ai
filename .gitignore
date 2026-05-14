@@ -36,3 +36,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# local scratch / issue notes (not for version control)
+context/current-issues/current-issues.md
