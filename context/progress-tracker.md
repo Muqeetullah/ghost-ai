@@ -22,6 +22,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Project dialogs and editor home from `context/feature-specs/04-project-dialogs.md`: mock project lists, owned-project actions, create/rename/delete dialogs, live slug preview, and mobile sidebar scrim.
 - Current issue fix for project creation: created mock projects now appear in the sidebar, and invalid special characters block submission instead of being silently stripped from the slug preview.
 - Verified review fixes: current issue notes untracked while ignored locally, project dialog submit cleanup is guaranteed with async try/finally, and the project dialog spec now explicitly permits scoped sidebar changes.
+- Prisma schema and data layer from `context/feature-specs/05-prisma.md`: Project and ProjectCollaborator models, Prisma schema folder setup, cached Prisma singleton with Prisma Postgres/direct Postgres branching, generated client, and applied migration.
 
 ## In Progress
 
@@ -63,3 +64,6 @@ Update this file whenever the current phase, active feature, or implementation s
 - 2026-05-14: Completed authenticated user menu fix. Split compact `UserButton` Clerk appearance from full-width auth form appearance, added a lower-opacity modal backdrop token, and applied it to Clerk modal styling. Verified with lint and production build; in-app browser was signed out, so `/editor` redirected to Clerk sign-in during visual check.
 - 2026-05-14: Started Clerk local auth redirect fix based on `context/current-issues/current-issues.md`.
 - 2026-05-14: Completed Clerk local auth redirect fix. Passed explicit sign-in and sign-up URLs into `clerkMiddleware`, verified lint and production build, and confirmed `/editor` redirects to local `/sign-in` when signed out.
+- 2026-05-14: Completed Prisma Postgres setup end to end. Installed Prisma runtime dependencies, restored `DATABASE_URL` into ignored `.env` from local env, added Prisma schema/config and generated client output, applied the initial migration, added seed data and a server-only Prisma singleton, verified a live database read, and kept secrets out of logs.
+- 2026-05-14: Started Prisma schema and data layer implementation from `context/feature-specs/05-prisma.md`.
+- 2026-05-14: Completed Prisma schema and data layer implementation. Moved models into `prisma/models/project.prisma`, added `ProjectStatus`, `Project`, and `ProjectCollaborator` with the requested indexes and cascade relation, updated `lib/prisma.ts` to branch between Prisma Postgres Accelerate URLs and direct `@prisma/adapter-pg`, applied the project data layer migration, regenerated the client, and verified with Prisma status, lint, `tsc --noEmit`, and production build.
