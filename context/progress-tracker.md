@@ -25,6 +25,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Prisma schema and data layer from `context/feature-specs/05-prisma.md`: Project and ProjectCollaborator models, Prisma schema folder setup, cached Prisma singleton with Prisma Postgres/direct Postgres branching, generated client, and applied migration.
 - Backend project API routes from `context/feature-specs/06-project-apis.md`: list/create owned projects, rename/delete with owner checks, route-level `401` and `403` responses, and project route proxy handoff.
 - Editor home real project API wiring from `context/feature-specs/07-wire-editor-home.md`: server-loaded owned/shared project lists, real create/rename/delete mutations, room ID preview, workspace navigation, active workspace route, and delete redirect/refresh behavior.
+- Editor workspace shell from `context/feature-specs/08-editor-workspace-shell.md`: `/editor/[roomId]` server component, project access helper, access denied state, active project workspace layout, canvas placeholder, and AI sidebar placeholder.
+- Share dialog from `context/feature-specs/09-share-dialog.md`: workspace share button, collaborator invite/list/remove APIs, owner-only management, read-only collaborator view, Clerk user enrichment, and project-link copy feedback.
 
 ## In Progress
 
@@ -44,6 +46,10 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Session Notes
 
+- 2026-05-15: Completed share dialog implementation. Added collaborator list/invite/remove project API routes, enforced owner-only invite/remove on the server, enriched collaborator emails from Clerk when available with email fallback, wired the workspace Share button to a role-aware dialog, added copy-link feedback, and verified with lint, `tsc --noEmit`, production build, and a signed-out route redirect smoke check.
+- 2026-05-15: Started share dialog implementation from `context/feature-specs/09-share-dialog.md`.
+- 2026-05-15: Completed editor workspace shell implementation. Added server-side access checks for `/editor/[roomId]`, created `lib/project-access.ts`, added the `AccessDenied` state, moved the active workspace route from `[projectId]` to `[roomId]`, built the workspace layout with project sidebar, canvas placeholder, navbar actions, and AI placeholder sidebar, and verified with lint, `tsc --noEmit`, production build, and a signed-out browser redirect check.
+- 2026-05-15: Started editor workspace shell implementation from `context/feature-specs/08-editor-workspace-shell.md`.
 - 2026-05-14: Limited shared-project collaborator lookups to verified Clerk email addresses only.
 - 2026-05-14: Updated editor project list unauthenticated redirects to use `NEXT_PUBLIC_CLERK_SIGN_IN_URL` with `/sign-in` fallback.
 - 2026-05-14: Fixed project creation duplicate ID handling by removing the non-atomic pre-check and mapping Prisma `P2002` create failures to `409`.
