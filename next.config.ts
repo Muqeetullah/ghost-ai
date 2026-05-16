@@ -8,7 +8,6 @@ const nextConfig: NextConfig = {
         hostname: "img.clerk.com",
         port: "",
         pathname: "/**",
-        search: "",
       },
     ],
   },

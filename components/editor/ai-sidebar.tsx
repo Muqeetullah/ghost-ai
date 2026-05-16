@@ -29,6 +29,7 @@ export function AiSidebar({ isOpen, onClose }: AiSidebarProps) {
   const [prompt, setPrompt] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const isComposingRef = useRef(false)
 
   function updatePrompt(value: string) {
     setPrompt(value)
@@ -78,7 +79,7 @@ export function AiSidebar({ isOpen, onClose }: AiSidebarProps) {
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter" || event.shiftKey) {
+    if (event.key !== "Enter" || event.shiftKey || isComposingRef.current) {
       return
     }
 
@@ -135,13 +136,13 @@ export function AiSidebar({ isOpen, onClose }: AiSidebarProps) {
           <TabsList className="grid h-9 w-full grid-cols-2 rounded-xl border border-surface-border bg-bg-subtle p-1">
             <TabsTrigger
               value="architect"
-              className="rounded-lg text-xs text-copy-muted data-active:bg-accent data-active:text-accent-foreground data-active:shadow-none"
+              className="rounded-lg text-xs text-copy-muted data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none"
             >
               AI Architect
             </TabsTrigger>
             <TabsTrigger
               value="specs"
-              className="rounded-lg text-xs text-copy-muted data-active:bg-accent data-active:text-accent-foreground data-active:shadow-none"
+              className="rounded-lg text-xs text-copy-muted data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-none"
             >
               Specs
             </TabsTrigger>
@@ -209,6 +210,12 @@ export function AiSidebar({ isOpen, onClose }: AiSidebarProps) {
                   ref={textareaRef}
                   value={prompt}
                   onChange={(event) => updatePrompt(event.target.value)}
+                  onCompositionStart={() => {
+                    isComposingRef.current = true
+                  }}
+                  onCompositionEnd={() => {
+                    isComposingRef.current = false
+                  }}
                   onKeyDown={handleComposerKeyDown}
                   placeholder="Ask Ghost AI to design, refine, or explain..."
                   className="max-h-40 min-h-[72px] resize-none border-surface-border bg-bg-elevated text-copy-primary placeholder:text-copy-faint"
@@ -230,7 +237,11 @@ export function AiSidebar({ isOpen, onClose }: AiSidebarProps) {
           <TabsContent value="specs" className="mt-4 min-h-0 space-y-4">
             <Button
               type="button"
-              className="w-full bg-ai text-copy-primary hover:bg-ai/90"
+              disabled
+              aria-disabled="true"
+              aria-label="Generate Spec (coming soon)"
+              title="Coming soon"
+              className="w-full bg-ai text-copy-primary hover:bg-ai/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FileText className="h-4 w-4" />
               Generate Spec

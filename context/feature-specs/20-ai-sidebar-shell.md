@@ -36,11 +36,11 @@ Complete the existing AI sidebar placeholder and turn it into a proper floating 
    - user messages should be right-aligned with `bg-brand-dim border-brand/50 border-2 text-copy-primary`
    - assistant messages should be left-aligned with `bg-elevated border border-surface-border text-accent-text`
    - input area with an auto-resizing textarea, around 72px min height and 160px max height
-   - send button should use `bg-accent text-white`
+   - send button should use `bg-accent text-accent-foreground`
    - `Enter` submits, `Shift+Enter` adds a newline
 
 5. Build the Specs tab.
-   - show a `Generate Spec` button using `bg-accent text-white`
+   - show a `Generate Spec` button using `bg-accent text-accent-foreground`
    - show a demo spec card for now
    - style the card with `bg-elevated` and `border-surface-border`
    - include a file/spec icon, title, short snippet, and disabled download action

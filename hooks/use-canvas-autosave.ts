@@ -97,12 +97,6 @@ export function useCanvasAutosave({
       return
     }
 
-    if (lastSavedSnapshotRef.current === null) {
-      lastSavedSnapshotRef.current = serializedSnapshot
-      setStatus("saved")
-      return
-    }
-
     if (lastSavedSnapshotRef.current === serializedSnapshot) {
       setStatus("saved")
       return

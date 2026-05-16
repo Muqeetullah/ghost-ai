@@ -505,8 +505,14 @@ function CanvasFlow({
       })
 
       addShapeNode(payload, {
-        x: centerPosition.x - payload.size.width / 2,
-        y: centerPosition.y - payload.size.height / 2,
+        x:
+          centerPosition.x -
+          payload.size.width / 2 -
+          payload.grabOffset.x,
+        y:
+          centerPosition.y -
+          payload.size.height / 2 -
+          payload.grabOffset.y,
       })
     },
     [addShapeNode, clearShapeDragPreview]
