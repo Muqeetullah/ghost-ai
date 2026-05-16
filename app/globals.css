@@ -136,3 +136,16 @@
     @apply font-sans;
     }
 }
+
+@layer components {
+  .node-color-swatch {
+    box-shadow: none;
+  }
+
+  .node-color-swatch:hover,
+  .node-color-swatch[data-active="true"] {
+    box-shadow:
+      0 0 0 2px var(--node-swatch-glow),
+      0 0 8px color-mix(in srgb, var(--node-swatch-glow) 38%, transparent);
+  }
+}

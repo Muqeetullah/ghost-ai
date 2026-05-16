@@ -1,4 +1,10 @@
-import type { ChangeEvent, KeyboardEvent, ReactNode, RefObject } from "react"
+import type {
+  ChangeEvent,
+  CSSProperties,
+  KeyboardEvent,
+  ReactNode,
+  RefObject,
+} from "react"
 import { useEffect, useRef, useState } from "react"
 import {
   Handle,
@@ -9,7 +15,13 @@ import {
 } from "@xyflow/react"
 
 import { cn } from "@/lib/utils"
-import type { CanvasEdge, CanvasNode, CanvasNodeShape } from "@/types/canvas"
+import {
+  NODE_COLORS,
+  type CanvasEdge,
+  type CanvasNode,
+  type CanvasNodeColor,
+  type CanvasNodeShape,
+} from "@/types/canvas"
 
 const MIN_NODE_WIDTH = 88
 const MIN_NODE_HEIGHT = 56
@@ -20,6 +32,17 @@ const HANDLE_POSITIONS = [
   { id: "bottom", position: Position.Bottom },
   { id: "left", position: Position.Left },
 ] as const
+
+const NODE_COLOR_LABELS = [
+  "Neutral",
+  "Blue",
+  "Purple",
+  "Orange",
+  "Red",
+  "Pink",
+  "Green",
+  "Teal",
+] as const satisfies readonly string[]
 
 interface NodeShapeSurfaceProps {
   shape: CanvasNodeShape
@@ -55,6 +78,10 @@ export function CanvasNodeRenderer({
     updateNodeData(id, { label: event.target.value })
   }
 
+  const handleColorSelect = (color: CanvasNodeColor) => {
+    updateNodeData(id, { color })
+  }
+
   const handleLabelKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Escape") {
       return
@@ -66,6 +93,13 @@ export function CanvasNodeRenderer({
 
   return (
     <div className="group relative h-full w-full">
+      {selected ? (
+        <NodeColorToolbar
+          activeColor={data.color}
+          onSelectColor={handleColorSelect}
+        />
+      ) : null}
+
       <NodeResizer
         isVisible={selected}
         minWidth={MIN_NODE_WIDTH}
@@ -106,6 +140,63 @@ export function CanvasNodeRenderer({
       ))}
     </div>
   )
+}
+
+interface NodeColorToolbarProps {
+  activeColor: CanvasNodeColor
+  onSelectColor: (color: CanvasNodeColor) => void
+}
+
+function NodeColorToolbar({
+  activeColor,
+  onSelectColor,
+}: NodeColorToolbarProps) {
+  return (
+    <div
+      className="nodrag nopan pointer-events-auto absolute left-1/2 top-0 z-30 -mt-2 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-full border border-surface-border bg-sidebar p-1 shadow-2xl backdrop-blur-xl"
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {NODE_COLORS.map((color, index) => {
+        const isActive =
+          activeColor.fill === color.fill && activeColor.text === color.text
+
+        return (
+          <button
+            key={color.fill}
+            type="button"
+            aria-label={`Apply ${NODE_COLOR_LABELS[index]} node color`}
+            aria-pressed={isActive}
+            title={NODE_COLOR_LABELS[index]}
+            data-active={isActive}
+            className="node-color-swatch h-6 w-6 rounded-full border p-0.5 transition-[border-color,box-shadow,transform] hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand data-[active=true]:scale-110"
+            style={{
+              "--node-swatch-glow": color.text,
+              backgroundColor: color.fill,
+              borderColor: isActive ? color.text : "var(--border-subtle)",
+              color: color.text,
+            } as NodeColorSwatchStyle}
+            onClick={(event) => {
+              event.stopPropagation()
+              onSelectColor(color)
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <span
+              aria-hidden="true"
+              className="block h-full w-full rounded-full opacity-90"
+              style={{ backgroundColor: color.text }}
+            />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+interface NodeColorSwatchStyle extends CSSProperties {
+  "--node-swatch-glow": string
 }
 
 interface NodeLabelProps {
