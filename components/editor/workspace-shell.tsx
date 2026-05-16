@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Bot, MessageSquare, Share2, X } from "lucide-react"
+import { Bot, Share2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { CanvasRoom } from "@/components/editor/canvas-room"
 import { EditorNavbar } from "@/components/editor/editor-navbar"
 import { ProjectDialogs } from "@/components/editor/project-dialogs"
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
@@ -91,20 +92,7 @@ export function WorkspaceShell({
       />
 
       <main className="relative min-h-0 flex-1 overflow-hidden bg-base">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--border-default)_1px,transparent_1px)] bg-[length:24px_24px]" />
-        <section className="relative flex h-full min-h-0 items-center justify-center px-6 text-center">
-          <div className="max-w-md">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-surface-border bg-bg-surface text-brand">
-              <MessageSquare className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <h1 className="mt-5 text-2xl font-semibold tracking-normal text-copy-primary">
-              Canvas placeholder
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-copy-muted">
-              {project.name} is ready for the shared architecture canvas.
-            </p>
-          </div>
-        </section>
+        <CanvasRoom roomId={project.id} />
       </main>
 
       {isAiSidebarOpen ? (

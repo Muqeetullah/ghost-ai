@@ -29,24 +29,16 @@ export async function DELETE(
     return jsonError("Forbidden", 403)
   }
 
-  const collaborator = await prisma.projectCollaborator.findUnique({
+  const { count } = await prisma.projectCollaborator.deleteMany({
     where: {
       id: collaboratorId,
-    },
-    select: {
-      projectId: true,
+      projectId,
     },
   })
 
-  if (!collaborator || collaborator.projectId !== projectId) {
+  if (count === 0) {
     return jsonError("Collaborator not found", 404)
   }
-
-  await prisma.projectCollaborator.delete({
-    where: {
-      id: collaboratorId,
-    },
-  })
 
   return new Response(null, { status: 204 })
 }

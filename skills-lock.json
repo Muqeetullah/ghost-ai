@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "liveblocks-best-practices": {
+      "source": "liveblocks/skills",
+      "sourceType": "github",
+      "skillPath": "skills/liveblocks-best-practices/SKILL.md",
+      "computedHash": "2b3daf7dda490867910431e73bc782b167159be668ac658977cc1fe5464d1d96"
+    },
+    "yjs-best-practices": {
+      "source": "liveblocks/skills",
+      "sourceType": "github",
+      "skillPath": "skills/yjs-best-practices/SKILL.md",
+      "computedHash": "c140ed344e2a321d5b59196f1e50cb9d96db36e3da566993ad4ada409fb67ef9"
+    }
+  }
+}
