@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Bot, Share2, X } from "lucide-react"
+import { Bot, LayoutTemplate, Share2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { CanvasRoom } from "@/components/editor/canvas-room"
@@ -9,6 +9,11 @@ import { EditorNavbar } from "@/components/editor/editor-navbar"
 import { ProjectDialogs } from "@/components/editor/project-dialogs"
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
 import { ShareDialog } from "@/components/editor/share-dialog"
+import {
+  type CanvasTemplate,
+  type CanvasTemplateImport,
+} from "@/components/editor/starter-templates"
+import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal"
 import { useProjectActions } from "@/hooks/use-project-actions"
 import { cn } from "@/lib/utils"
 import type { EditorProject } from "@/types/projects"
@@ -33,8 +38,18 @@ export function WorkspaceShell({
   const [isProjectSidebarOpen, setIsProjectSidebarOpen] = useState(true)
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(true)
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
+  const [templateImport, setTemplateImport] =
+    useState<CanvasTemplateImport | null>(null)
   const projectActions = useProjectActions({ activeProjectId: project.id })
   const canManageSharing = project.accessRole === "owner"
+
+  function handleTemplateImport(template: CanvasTemplate) {
+    setTemplateImport((currentImport) => ({
+      id: (currentImport?.id ?? 0) + 1,
+      template,
+    }))
+  }
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-base text-copy-primary">
@@ -53,6 +68,17 @@ export function WorkspaceShell({
         }
         actions={
           <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Import starter template"
+              onClick={() => setIsTemplatesModalOpen(true)}
+              className="text-copy-muted hover:bg-bg-subtle hover:text-copy-primary"
+            >
+              <LayoutTemplate className="h-4 w-4" />
+              Templates
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -92,7 +118,7 @@ export function WorkspaceShell({
       />
 
       <main className="relative min-h-0 flex-1 overflow-hidden bg-base">
-        <CanvasRoom roomId={project.id} />
+        <CanvasRoom roomId={project.id} templateImport={templateImport} />
       </main>
 
       {isAiSidebarOpen ? (
@@ -161,6 +187,12 @@ export function WorkspaceShell({
         projectName={project.name}
         canManage={canManageSharing}
         onOpenChange={setIsShareDialogOpen}
+      />
+
+      <StarterTemplatesModal
+        isOpen={isTemplatesModalOpen}
+        onImport={handleTemplateImport}
+        onOpenChange={setIsTemplatesModalOpen}
       />
     </div>
   )

@@ -17,17 +17,26 @@ import {
 } from "@liveblocks/react/suspense"
 import { Cursors, useLiveblocksFlow } from "@liveblocks/react-flow"
 import {
+  useCanRedo,
+  useCanUndo,
+  useRedo,
+  useUndo,
+} from "@liveblocks/react/suspense"
+import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
   ConnectionMode,
   MarkerType,
   MiniMap,
+  Panel,
   ReactFlow,
   type DefaultEdgeOptions,
   type ReactFlowInstance,
 } from "@xyflow/react"
+import { Maximize2, Redo2, Undo2, ZoomIn, ZoomOut } from "lucide-react"
 
+import { CanvasEdgeRenderer } from "@/components/editor/canvas-edge"
 import {
   CanvasNodeRenderer,
   NodeShapeSurface,
@@ -38,18 +47,26 @@ import {
   readShapeDragPayload,
   type ShapeDragPayload,
 } from "@/components/editor/shape-panel"
+import { Button } from "@/components/ui/button"
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import {
+  CANVAS_EDGE_TYPE,
   CANVAS_NODE_TYPE,
   DEFAULT_NODE_COLOR,
   type CanvasEdge,
   type CanvasNode,
 } from "@/types/canvas"
+import {
+  cloneTemplateEdges,
+  cloneTemplateNodes,
+  type CanvasTemplateImport,
+} from "@/components/editor/starter-templates"
 
 const initialNodes: CanvasNode[] = []
 const initialEdges: CanvasEdge[] = []
 
 const defaultEdgeOptions: DefaultEdgeOptions = {
-  type: "smoothstep",
+  type: CANVAS_EDGE_TYPE,
   markerEnd: {
     type: MarkerType.ArrowClosed,
     color: "var(--text-primary)",
@@ -64,8 +81,15 @@ const nodeTypes = {
   [CANVAS_NODE_TYPE]: CanvasNodeRenderer,
 }
 
+const edgeTypes = {
+  [CANVAS_EDGE_TYPE]: CanvasEdgeRenderer,
+}
+
+const VIEWPORT_ANIMATION_DURATION = 160
+
 interface CanvasRoomProps {
   roomId: string
+  templateImport: CanvasTemplateImport | null
 }
 
 interface ShapeDragPreview {
@@ -76,7 +100,7 @@ interface ShapeDragPreview {
   }
 }
 
-export function CanvasRoom({ roomId }: CanvasRoomProps) {
+export function CanvasRoom({ roomId, templateImport }: CanvasRoomProps) {
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
       <RoomProvider
@@ -85,7 +109,7 @@ export function CanvasRoom({ roomId }: CanvasRoomProps) {
       >
         <CanvasErrorBoundary key={roomId} fallback={<CanvasErrorState />}>
           <ClientSideSuspense fallback={<CanvasLoadingState />}>
-            {() => <CanvasFlow />}
+            {() => <CanvasFlow templateImport={templateImport} />}
           </ClientSideSuspense>
         </CanvasErrorBoundary>
       </RoomProvider>
@@ -93,12 +117,22 @@ export function CanvasRoom({ roomId }: CanvasRoomProps) {
   )
 }
 
-function CanvasFlow() {
+interface CanvasFlowProps {
+  templateImport: CanvasTemplateImport | null
+}
+
+function CanvasFlow({ templateImport }: CanvasFlowProps) {
   const flowInstanceRef =
     useRef<ReactFlowInstance<CanvasNode, CanvasEdge> | null>(null)
   const nodeCounterRef = useRef(0)
+  const [flowInstance, setFlowInstance] =
+    useState<ReactFlowInstance<CanvasNode, CanvasEdge> | null>(null)
   const [shapeDragPreview, setShapeDragPreview] =
     useState<ShapeDragPreview | null>(null)
+  const undo = useUndo()
+  const redo = useRedo()
+  const canUndo = useCanUndo()
+  const canRedo = useCanRedo()
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
@@ -113,9 +147,68 @@ function CanvasFlow() {
   const handleInit = useCallback(
     (flowInstance: ReactFlowInstance<CanvasNode, CanvasEdge>) => {
       flowInstanceRef.current = flowInstance
+      setFlowInstance(flowInstance)
     },
     []
   )
+
+  const handleZoomIn = useCallback(() => {
+    void flowInstance?.zoomIn({ duration: VIEWPORT_ANIMATION_DURATION })
+  }, [flowInstance])
+
+  const handleZoomOut = useCallback(() => {
+    void flowInstance?.zoomOut({ duration: VIEWPORT_ANIMATION_DURATION })
+  }, [flowInstance])
+
+  const handleFitView = useCallback(() => {
+    void flowInstance?.fitView({
+      duration: VIEWPORT_ANIMATION_DURATION,
+      padding: 0.16,
+    })
+  }, [flowInstance])
+
+  const handleConnect = useCallback(
+    (connection: Parameters<typeof onConnect>[0]) => {
+      const canvasEdgeConnection = {
+        ...connection,
+        type: CANVAS_EDGE_TYPE,
+      }
+
+      onConnect(canvasEdgeConnection)
+    },
+    [onConnect]
+  )
+
+  useKeyboardShortcuts(flowInstance, { undo, redo })
+
+  useEffect(() => {
+    if (!templateImport || !flowInstance) {
+      return
+    }
+
+    let addTemplateFrame = 0
+    let fitViewFrame = 0
+
+    flowInstance.setEdges([])
+    flowInstance.setNodes([])
+
+    addTemplateFrame = window.requestAnimationFrame(() => {
+      flowInstance.setNodes(cloneTemplateNodes(templateImport.template))
+      flowInstance.setEdges(cloneTemplateEdges(templateImport.template))
+
+      fitViewFrame = window.requestAnimationFrame(() => {
+        void flowInstance.fitView({
+          duration: VIEWPORT_ANIMATION_DURATION,
+          padding: 0.18,
+        })
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(addTemplateFrame)
+      window.cancelAnimationFrame(fitViewFrame)
+    }
+  }, [flowInstance, templateImport])
 
   const clearShapeDragPreview = useCallback(() => {
     setShapeDragPreview(null)
@@ -271,10 +364,11 @@ function CanvasFlow() {
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onInit={handleInit}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
+      onConnect={handleConnect}
       onDelete={onDelete}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -301,12 +395,106 @@ function CanvasFlow() {
       />
       <Cursors />
       <CanvasShapeDragPreview preview={shapeDragPreview} />
+      <CanvasControlBar
+        canRedo={canRedo}
+        canUndo={canUndo}
+        onFitView={handleFitView}
+        onRedo={redo}
+        onUndo={undo}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+      />
       <CanvasShapePanel
         onShapeDragStart={handleShapeDragStart}
         onShapeDragEnd={clearShapeDragPreview}
         onShapeInsert={handleShapeInsert}
       />
     </ReactFlow>
+  )
+}
+
+interface CanvasControlBarProps {
+  canRedo: boolean
+  canUndo: boolean
+  onFitView: () => void
+  onRedo: () => void
+  onUndo: () => void
+  onZoomIn: () => void
+  onZoomOut: () => void
+}
+
+function CanvasControlBar({
+  canRedo,
+  canUndo,
+  onFitView,
+  onRedo,
+  onUndo,
+  onZoomIn,
+  onZoomOut,
+}: CanvasControlBarProps) {
+  return (
+    <Panel position="bottom-left" className="pointer-events-auto !m-4 !mb-24">
+      <div className="flex items-center gap-1 rounded-full border border-surface-border bg-sidebar p-1.5 shadow-2xl backdrop-blur-xl">
+        <CanvasControlButton label="Zoom out" onClick={onZoomOut}>
+          <ZoomOut className="h-4 w-4" />
+        </CanvasControlButton>
+        <CanvasControlButton label="Fit view" onClick={onFitView}>
+          <Maximize2 className="h-4 w-4" />
+        </CanvasControlButton>
+        <CanvasControlButton label="Zoom in" onClick={onZoomIn}>
+          <ZoomIn className="h-4 w-4" />
+        </CanvasControlButton>
+
+        <span
+          aria-hidden="true"
+          className="mx-1 h-6 w-px bg-surface-border"
+        />
+
+        <CanvasControlButton
+          disabled={!canUndo}
+          label="Undo"
+          onClick={onUndo}
+        >
+          <Undo2 className="h-4 w-4" />
+        </CanvasControlButton>
+        <CanvasControlButton
+          disabled={!canRedo}
+          label="Redo"
+          onClick={onRedo}
+        >
+          <Redo2 className="h-4 w-4" />
+        </CanvasControlButton>
+      </div>
+    </Panel>
+  )
+}
+
+interface CanvasControlButtonProps {
+  children: ReactNode
+  disabled?: boolean
+  label: string
+  onClick: () => void
+}
+
+function CanvasControlButton({
+  children,
+  disabled = false,
+  label,
+  onClick,
+}: CanvasControlButtonProps) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-lg"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-full text-copy-muted hover:bg-bg-subtle hover:text-copy-primary disabled:cursor-not-allowed disabled:opacity-35"
+    >
+      {children}
+    </Button>
   )
 }
 
