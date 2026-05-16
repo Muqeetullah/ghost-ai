@@ -8,19 +8,24 @@ import {
   useState,
   type DragEvent as ReactDragEvent,
   type ErrorInfo,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react"
+import { UserButton, useUser } from "@clerk/nextjs"
+import { shallow } from "@liveblocks/client"
 import {
   ClientSideSuspense,
   LiveblocksProvider,
   RoomProvider,
 } from "@liveblocks/react/suspense"
-import { Cursors, useLiveblocksFlow } from "@liveblocks/react-flow"
+import { useLiveblocksFlow } from "@liveblocks/react-flow"
 import {
   useCanRedo,
   useCanUndo,
+  useOthers,
   useRedo,
   useUndo,
+  useUpdateMyPresence,
 } from "@liveblocks/react/suspense"
 import {
   Background,
@@ -32,7 +37,11 @@ import {
   Panel,
   ReactFlow,
   type DefaultEdgeOptions,
+  type OnDelete,
   type ReactFlowInstance,
+  useReactFlow,
+  useEdges,
+  useNodes,
 } from "@xyflow/react"
 import { Maximize2, Redo2, Undo2, ZoomIn, ZoomOut } from "lucide-react"
 
@@ -48,6 +57,10 @@ import {
   type ShapeDragPayload,
 } from "@/components/editor/shape-panel"
 import { Button } from "@/components/ui/button"
+import {
+  type CanvasSaveStatus,
+  useCanvasAutosave,
+} from "@/hooks/use-canvas-autosave"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import {
   CANVAS_EDGE_TYPE,
@@ -55,12 +68,15 @@ import {
   DEFAULT_NODE_COLOR,
   type CanvasEdge,
   type CanvasNode,
+  type CanvasSnapshot,
 } from "@/types/canvas"
 import {
   cloneTemplateEdges,
   cloneTemplateNodes,
   type CanvasTemplateImport,
 } from "@/components/editor/starter-templates"
+import { clerkUserButtonAppearance } from "@/lib/clerk-appearance"
+import { cn } from "@/lib/utils"
 
 const initialNodes: CanvasNode[] = []
 const initialEdges: CanvasEdge[] = []
@@ -88,6 +104,8 @@ const edgeTypes = {
 const VIEWPORT_ANIMATION_DURATION = 160
 
 interface CanvasRoomProps {
+  onSaveNowChange: (saveNow: (() => void) | null) => void
+  onSaveStatusChange: (status: CanvasSaveStatus) => void
   roomId: string
   templateImport: CanvasTemplateImport | null
 }
@@ -100,16 +118,28 @@ interface ShapeDragPreview {
   }
 }
 
-export function CanvasRoom({ roomId, templateImport }: CanvasRoomProps) {
+export function CanvasRoom({
+  onSaveNowChange,
+  onSaveStatusChange,
+  roomId,
+  templateImport,
+}: CanvasRoomProps) {
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
       <RoomProvider
         id={roomId}
-        initialPresence={{ cursor: null, isThinking: false }}
+        initialPresence={{ cursor: null, thinking: false }}
       >
         <CanvasErrorBoundary key={roomId} fallback={<CanvasErrorState />}>
           <ClientSideSuspense fallback={<CanvasLoadingState />}>
-            {() => <CanvasFlow templateImport={templateImport} />}
+            {() => (
+              <CanvasFlow
+                onSaveNowChange={onSaveNowChange}
+                onSaveStatusChange={onSaveStatusChange}
+                projectId={roomId}
+                templateImport={templateImport}
+              />
+            )}
           </ClientSideSuspense>
         </CanvasErrorBoundary>
       </RoomProvider>
@@ -118,10 +148,18 @@ export function CanvasRoom({ roomId, templateImport }: CanvasRoomProps) {
 }
 
 interface CanvasFlowProps {
+  onSaveNowChange: (saveNow: (() => void) | null) => void
+  onSaveStatusChange: (status: CanvasSaveStatus) => void
+  projectId: string
   templateImport: CanvasTemplateImport | null
 }
 
-function CanvasFlow({ templateImport }: CanvasFlowProps) {
+function CanvasFlow({
+  onSaveNowChange,
+  onSaveStatusChange,
+  projectId,
+  templateImport,
+}: CanvasFlowProps) {
   const flowInstanceRef =
     useRef<ReactFlowInstance<CanvasNode, CanvasEdge> | null>(null)
   const nodeCounterRef = useRef(0)
@@ -129,10 +167,12 @@ function CanvasFlow({ templateImport }: CanvasFlowProps) {
     useState<ReactFlowInstance<CanvasNode, CanvasEdge> | null>(null)
   const [shapeDragPreview, setShapeDragPreview] =
     useState<ShapeDragPreview | null>(null)
+  const [hasCheckedSavedCanvas, setHasCheckedSavedCanvas] = useState(false)
   const undo = useUndo()
   const redo = useRedo()
   const canUndo = useCanUndo()
   const canRedo = useCanRedo()
+  const updateMyPresence = useUpdateMyPresence()
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
@@ -143,6 +183,26 @@ function CanvasFlow({ templateImport }: CanvasFlowProps) {
         initial: initialEdges,
       },
     })
+  const isAutosaveEnabled =
+    hasCheckedSavedCanvas || nodes.length > 0 || edges.length > 0
+  const { saveNow, status: saveStatus } = useCanvasAutosave({
+    edges,
+    enabled: isAutosaveEnabled,
+    nodes,
+    projectId,
+  })
+
+  useEffect(() => {
+    onSaveStatusChange(saveStatus)
+  }, [onSaveStatusChange, saveStatus])
+
+  useEffect(() => {
+    onSaveNowChange(saveNow)
+
+    return () => {
+      onSaveNowChange(null)
+    }
+  }, [onSaveNowChange, saveNow])
 
   const handleInit = useCallback(
     (flowInstance: ReactFlowInstance<CanvasNode, CanvasEdge>) => {
@@ -179,7 +239,97 @@ function CanvasFlow({ templateImport }: CanvasFlowProps) {
     [onConnect]
   )
 
+  const handleMouseMove = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      const bounds = event.currentTarget.getBoundingClientRect()
+
+      updateMyPresence({
+        cursor: {
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        },
+      })
+    },
+    [updateMyPresence]
+  )
+
+  const handleMouseLeave = useCallback(() => {
+    updateMyPresence({ cursor: null })
+  }, [updateMyPresence])
+
   useKeyboardShortcuts(flowInstance, { undo, redo })
+
+  useEffect(() => {
+    return () => {
+      updateMyPresence({ cursor: null })
+    }
+  }, [updateMyPresence])
+
+  useEffect(() => {
+    if (!flowInstance || hasCheckedSavedCanvas) {
+      return
+    }
+
+    if (nodes.length > 0 || edges.length > 0) {
+      return
+    }
+
+    let isCancelled = false
+    let fitViewFrame = 0
+
+    async function loadSavedCanvas() {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/canvas`)
+
+        if (!response.ok) {
+          throw new Error("Canvas load failed")
+        }
+
+        const savedCanvas = readSavedCanvasResponse(await response.json())
+        const currentFlowInstance = flowInstanceRef.current
+
+        if (isCancelled || !savedCanvas || !currentFlowInstance) {
+          return
+        }
+
+        if (
+          currentFlowInstance.getNodes().length > 0 ||
+          currentFlowInstance.getEdges().length > 0
+        ) {
+          return
+        }
+
+        currentFlowInstance.setNodes(savedCanvas.nodes)
+        currentFlowInstance.setEdges(savedCanvas.edges)
+
+        if (savedCanvas.nodes.length > 0 || savedCanvas.edges.length > 0) {
+          fitViewFrame = window.requestAnimationFrame(() => {
+            void currentFlowInstance.fitView({
+              duration: VIEWPORT_ANIMATION_DURATION,
+              padding: 0.18,
+            })
+          })
+        }
+      } finally {
+        if (!isCancelled) {
+          setHasCheckedSavedCanvas(true)
+        }
+      }
+    }
+
+    void loadSavedCanvas()
+
+    return () => {
+      isCancelled = true
+      window.cancelAnimationFrame(fitViewFrame)
+    }
+  }, [
+    edges.length,
+    flowInstance,
+    hasCheckedSavedCanvas,
+    nodes.length,
+    projectId,
+  ])
 
   useEffect(() => {
     if (!templateImport || !flowInstance) {
@@ -349,12 +499,21 @@ function CanvasFlow({ templateImport }: CanvasFlowProps) {
 
       event.preventDefault()
 
-      const position = flowInstance.screenToFlowPosition({
+      const centerPosition = flowInstance.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       })
 
-      addShapeNode(payload, position)
+      addShapeNode(payload, {
+        x:
+          centerPosition.x -
+          payload.size.width / 2 -
+          payload.grabOffset.x,
+        y:
+          centerPosition.y -
+          payload.size.height / 2 -
+          payload.grabOffset.y,
+      })
     },
     [addShapeNode, clearShapeDragPreview]
   )
@@ -369,13 +528,14 @@ function CanvasFlow({ templateImport }: CanvasFlowProps) {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={handleConnect}
-      onDelete={onDelete}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      onMouseLeave={handleMouseLeave}
+      onMouseMove={handleMouseMove}
       connectionLineType={ConnectionLineType.SmoothStep}
       connectionMode={ConnectionMode.Loose}
       defaultEdgeOptions={defaultEdgeOptions}
-      fitView
+      deleteKeyCode={null}
       className="bg-base text-copy-primary"
     >
       <Background
@@ -393,7 +553,8 @@ function CanvasFlow({ templateImport }: CanvasFlowProps) {
         maskColor="var(--overlay-backdrop)"
         className="rounded-xl border border-surface-border bg-bg-surface shadow-2xl"
       />
-      <Cursors />
+      <CanvasPresenceGroup />
+      <CanvasLiveCursors />
       <CanvasShapeDragPreview preview={shapeDragPreview} />
       <CanvasControlBar
         canRedo={canRedo}
@@ -409,8 +570,290 @@ function CanvasFlow({ templateImport }: CanvasFlowProps) {
         onShapeDragEnd={clearShapeDragPreview}
         onShapeInsert={handleShapeInsert}
       />
+      <CanvasDeleteSelectionHandler
+        onDelete={onDelete}
+      />
     </ReactFlow>
   )
+}
+
+interface CanvasDeleteSelectionHandlerProps {
+  onDelete: OnDelete<CanvasNode, CanvasEdge>
+}
+
+function CanvasDeleteSelectionHandler({
+  onDelete,
+}: CanvasDeleteSelectionHandlerProps) {
+  const renderedNodes = useNodes<CanvasNode>()
+  const renderedEdges = useEdges<CanvasEdge>()
+  const { getEdges, getNodes } = useReactFlow<CanvasNode, CanvasEdge>()
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (
+        (event.key !== "Delete" && event.key !== "Backspace") ||
+        isEditableTarget(event.target)
+      ) {
+        return
+      }
+
+      const selectedNodes = getNodes().filter((node) => node.selected)
+      const selectedEdgesFromState = getEdges().filter((edge) => edge.selected)
+      const nodesToRemove =
+        selectedNodes.length > 0
+          ? selectedNodes
+          : renderedNodes.filter((node) => node.selected)
+      const edgesToRemove =
+        selectedEdgesFromState.length > 0
+          ? selectedEdgesFromState
+          : renderedEdges.filter((edge) => edge.selected)
+      const selectedNodeIds = new Set(nodesToRemove.map((node) => node.id))
+      const edgeIdsToRemove = new Set(edgesToRemove.map((edge) => edge.id))
+      const selectedEdges = getEdges().filter(
+        (edge) =>
+          edgeIdsToRemove.has(edge.id) ||
+          selectedNodeIds.has(edge.source) ||
+          selectedNodeIds.has(edge.target)
+      )
+
+      if (nodesToRemove.length === 0 && selectedEdges.length === 0) {
+        return
+      }
+
+      event.preventDefault()
+      onDelete({
+        edges: selectedEdges,
+        nodes: nodesToRemove,
+      })
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [
+    getEdges,
+    getNodes,
+    onDelete,
+    renderedEdges,
+    renderedNodes,
+  ])
+
+  return null
+}
+
+function readSavedCanvasResponse(value: unknown): CanvasSnapshot | null {
+  if (!isRecord(value) || !isCanvasSnapshot(value.canvas)) {
+    return null
+  }
+
+  return value.canvas
+}
+
+function isCanvasSnapshot(value: unknown): value is CanvasSnapshot {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.nodes) &&
+    Array.isArray(value.edges)
+  )
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target.isContentEditable ||
+    target.closest("[contenteditable='true']") !== null
+  )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+interface CollaboratorPresence {
+  avatar: string
+  color: string
+  connectionId: number
+  cursor: Liveblocks["Presence"]["cursor"]
+  id: string
+  name: string
+}
+
+function CanvasPresenceGroup() {
+  const { user } = useUser()
+  const currentUserId = user?.id ?? null
+  const collaborators = useOthers(
+    (others) =>
+      others
+        .filter((other) => other.id !== currentUserId)
+        .map((other) => ({
+          avatar: other.info.avatar,
+          color: other.info.color,
+          connectionId: other.connectionId,
+          cursor: other.presence.cursor,
+          id: other.id,
+          name: other.info.name,
+        })),
+    shallow
+  )
+  const visibleCollaborators = collaborators.slice(0, 5)
+  const overflowCount = Math.max(collaborators.length - visibleCollaborators.length, 0)
+
+  return (
+    <Panel position="top-right" className="pointer-events-auto !m-4">
+      <div className="flex items-center rounded-full border border-surface-border bg-sidebar px-2 py-1.5 shadow-2xl backdrop-blur-xl">
+        {visibleCollaborators.length > 0 ? (
+          <div className="flex -space-x-2">
+            {visibleCollaborators.map((collaborator) => (
+              <CollaboratorAvatar
+                key={collaborator.connectionId}
+                collaborator={collaborator}
+              />
+            ))}
+            {overflowCount > 0 ? (
+              <div
+                className="relative z-0 flex h-8 min-w-8 items-center justify-center rounded-full border border-surface-border bg-bg-elevated px-2 text-xs font-semibold text-copy-secondary ring-2 ring-bg-base"
+                aria-label={`${overflowCount} more collaborators present`}
+              >
+                +{overflowCount}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {collaborators.length > 0 ? (
+          <span
+            aria-hidden="true"
+            className="mx-2 h-6 w-px bg-surface-border"
+          />
+        ) : null}
+
+        <UserButton
+          appearance={clerkUserButtonAppearance}
+          userProfileMode="modal"
+        />
+      </div>
+    </Panel>
+  )
+}
+
+interface CollaboratorAvatarProps {
+  collaborator: CollaboratorPresence
+}
+
+function CollaboratorAvatar({ collaborator }: CollaboratorAvatarProps) {
+  const initials = getInitials(collaborator.name)
+
+  return (
+    <div
+      className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-surface-border bg-bg-elevated text-xs font-semibold text-copy-primary ring-2 ring-bg-base"
+      aria-label={`${collaborator.name} is present`}
+      title={collaborator.name}
+    >
+      {collaborator.avatar ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={collaborator.avatar}
+          alt=""
+          className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span aria-hidden="true">{initials}</span>
+      )}
+    </div>
+  )
+}
+
+function CanvasLiveCursors() {
+  const { user } = useUser()
+  const currentUserId = user?.id ?? null
+  const cursors = useOthers(
+    (others) =>
+      others
+        .filter((other) => other.id !== currentUserId && other.presence.cursor)
+        .map((other) => ({
+          avatar: other.info.avatar,
+          color: other.info.color,
+          connectionId: other.connectionId,
+          cursor: other.presence.cursor,
+          id: other.id,
+          name: other.info.name,
+        })),
+    shallow
+  )
+
+  if (cursors.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+      {cursors.map((participant) =>
+        participant.cursor ? (
+          <ParticipantCursor
+            key={participant.connectionId}
+            participant={participant}
+          />
+        ) : null
+      )}
+    </div>
+  )
+}
+
+interface ParticipantCursorProps {
+  participant: CollaboratorPresence
+}
+
+function ParticipantCursor({ participant }: ParticipantCursorProps) {
+  if (!participant.cursor) {
+    return null
+  }
+
+  return (
+    <div
+      className="absolute flex items-start"
+      style={{
+        left: participant.cursor.x,
+        top: participant.cursor.y,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        className="h-4 w-4"
+        style={{
+          backgroundColor: participant.color,
+          clipPath: "polygon(0 0, 0 100%, 36% 72%, 58% 100%, 78% 90%, 56% 62%, 100% 62%)",
+        }}
+      />
+      <span
+        className={cn(
+          "ml-1.5 mt-3 max-w-36 truncate rounded-full px-2 py-0.5",
+          "text-xs font-medium leading-5 text-bg-base shadow-xl"
+        )}
+        style={{ backgroundColor: participant.color }}
+      >
+        {participant.name}
+      </span>
+    </div>
+  )
+}
+
+function getInitials(name: string) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.at(0)?.toUpperCase() ?? "")
+    .join("")
+
+  return initials || "?"
 }
 
 interface CanvasControlBarProps {

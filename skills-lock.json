@@ -7,6 +7,24 @@
       "skillPath": "skills/liveblocks-best-practices/SKILL.md",
       "computedHash": "2b3daf7dda490867910431e73bc782b167159be668ac658977cc1fe5464d1d96"
     },
+    "trigger-agents": {
+      "source": "triggerdotdev/skills",
+      "sourceType": "github",
+      "skillPath": "trigger-agents/SKILL.md",
+      "computedHash": "e3e1d05b7589aba63215ce17a002217547f918da16984099bf924cdc4d8a8a61"
+    },
+    "trigger-config": {
+      "source": "triggerdotdev/skills",
+      "sourceType": "github",
+      "skillPath": "trigger-config/SKILL.md",
+      "computedHash": "c7422cc5945fb6f0ffc4bea6588bd8c4822ac93c9dbeefb0072a338a7ae2cd06"
+    },
+    "trigger-setup": {
+      "source": "triggerdotdev/skills",
+      "sourceType": "github",
+      "skillPath": "trigger-setup/SKILL.md",
+      "computedHash": "e6bea732fe6c8da34bd23e57d28351cc55e648039d28a10960306a06c68a6139"
+    },
     "yjs-best-practices": {
       "source": "liveblocks/skills",
       "sourceType": "github",
