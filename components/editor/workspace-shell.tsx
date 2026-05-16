@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { Bot, LayoutTemplate, Share2, X } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Bot, LayoutTemplate, Save, Share2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { AiSidebar } from "@/components/editor/ai-sidebar"
 import { CanvasRoom } from "@/components/editor/canvas-room"
 import { EditorNavbar } from "@/components/editor/editor-navbar"
 import { ProjectDialogs } from "@/components/editor/project-dialogs"
@@ -14,8 +15,8 @@ import {
   type CanvasTemplateImport,
 } from "@/components/editor/starter-templates"
 import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal"
+import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave"
 import { useProjectActions } from "@/hooks/use-project-actions"
-import { cn } from "@/lib/utils"
 import type { EditorProject } from "@/types/projects"
 
 interface WorkspaceProject {
@@ -41,8 +42,15 @@ export function WorkspaceShell({
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
   const [templateImport, setTemplateImport] =
     useState<CanvasTemplateImport | null>(null)
+  const [canvasSaveStatus, setCanvasSaveStatus] =
+    useState<CanvasSaveStatus>("saved")
+  const [canvasSaveNow, setCanvasSaveNow] = useState<(() => void) | null>(null)
   const projectActions = useProjectActions({ activeProjectId: project.id })
   const canManageSharing = project.accessRole === "owner"
+
+  const handleSaveNowChange = useCallback((saveNow: (() => void) | null) => {
+    setCanvasSaveNow(() => saveNow)
+  }, [])
 
   function handleTemplateImport(template: CanvasTemplate) {
     setTemplateImport((currentImport) => ({
@@ -56,6 +64,7 @@ export function WorkspaceShell({
       <EditorNavbar
         isSidebarOpen={isProjectSidebarOpen}
         onSidebarToggle={() => setIsProjectSidebarOpen((isOpen) => !isOpen)}
+        showUserButton={false}
         centerContent={
           <div className="min-w-0 text-center">
             <p className="truncate text-sm font-semibold text-copy-primary">
@@ -68,6 +77,10 @@ export function WorkspaceShell({
         }
         actions={
           <>
+            <CanvasSaveButton
+              onSave={canvasSaveNow}
+              status={canvasSaveStatus}
+            />
             <Button
               type="button"
               variant="ghost"
@@ -118,51 +131,18 @@ export function WorkspaceShell({
       />
 
       <main className="relative min-h-0 flex-1 overflow-hidden bg-base">
-        <CanvasRoom roomId={project.id} templateImport={templateImport} />
+        <CanvasRoom
+          onSaveNowChange={handleSaveNowChange}
+          onSaveStatusChange={setCanvasSaveStatus}
+          roomId={project.id}
+          templateImport={templateImport}
+        />
       </main>
 
-      {isAiSidebarOpen ? (
-        <button
-          type="button"
-          aria-label="Close AI sidebar"
-          onClick={() => setIsAiSidebarOpen(false)}
-          className="fixed inset-x-0 top-14 bottom-0 z-30 bg-[var(--overlay-backdrop)] md:hidden"
-        />
-      ) : null}
-
-      <aside
-        aria-hidden={!isAiSidebarOpen}
-        inert={!isAiSidebarOpen}
-        className={cn(
-          "fixed top-[4.5rem] right-4 bottom-4 z-40 flex w-[min(22rem,calc(100vw-2rem))] flex-col rounded-2xl border border-surface-border bg-sidebar p-4 shadow-2xl backdrop-blur-xl transition-transform duration-200 ease-out",
-          isAiSidebarOpen ? "translate-x-0" : "translate-x-[calc(100%+2rem)]"
-        )}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-copy-primary">AI</h2>
-            <p className="mt-1 truncate text-xs text-copy-muted">
-              Workspace assistant
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Close AI sidebar"
-            onClick={() => setIsAiSidebarOpen(false)}
-            className="text-copy-muted hover:bg-bg-subtle hover:text-copy-primary"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="flex min-h-0 flex-1 items-center justify-center text-center">
-          <p className="max-w-52 text-sm leading-6 text-copy-muted">
-            AI chat placeholder
-          </p>
-        </div>
-      </aside>
+      <AiSidebar
+        isOpen={isAiSidebarOpen}
+        onClose={() => setIsAiSidebarOpen(false)}
+      />
 
       <ProjectDialogs
         activeDialog={projectActions.activeDialog}
@@ -195,5 +175,52 @@ export function WorkspaceShell({
         onOpenChange={setIsTemplatesModalOpen}
       />
     </div>
+  )
+}
+
+interface CanvasSaveButtonProps {
+  onSave: (() => void) | null
+  status: CanvasSaveStatus
+}
+
+function CanvasSaveButton({ onSave, status }: CanvasSaveButtonProps) {
+  const [label, setLabel] = useState("Save")
+  const previousStatusRef = useRef<CanvasSaveStatus>(status)
+
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current
+    previousStatusRef.current = status
+    const timeoutIds: number[] = []
+
+    if (status === "saving") {
+      timeoutIds.push(window.setTimeout(() => setLabel("Saving..."), 0))
+    } else if (status === "error") {
+      timeoutIds.push(window.setTimeout(() => setLabel("Error"), 0))
+      timeoutIds.push(window.setTimeout(() => setLabel("Save"), 1400))
+    } else if (previousStatus === "saving") {
+      timeoutIds.push(window.setTimeout(() => setLabel("Saved"), 0))
+      timeoutIds.push(window.setTimeout(() => setLabel("Save"), 1400))
+    } else {
+      timeoutIds.push(window.setTimeout(() => setLabel("Save"), 0))
+    }
+
+    return () => {
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId))
+    }
+  }, [status])
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      aria-label={`Save canvas: ${label}`}
+      disabled={!onSave || status === "saving"}
+      onClick={() => onSave?.()}
+      className="min-w-24 text-copy-muted hover:bg-bg-subtle hover:text-copy-primary disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <Save className="h-4 w-4" />
+      {label}
+    </Button>
   )
 }

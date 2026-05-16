@@ -21,6 +21,7 @@ interface ShapeSize {
 }
 
 export interface ShapeDragPayload {
+  grabOffset: ShapeDragPosition
   shape: CanvasNodeShape
   size: ShapeSize
 }
@@ -129,7 +130,11 @@ function handleShapeDragStart(
   shape: CanvasNodeShape,
   onShapeDragStart?: CanvasShapePanelProps["onShapeDragStart"]
 ) {
-  const payload = createShapeDragPayload(shape)
+  const bounds = event.currentTarget.getBoundingClientRect()
+  const payload = createShapeDragPayload(shape, {
+    x: event.clientX - bounds.left,
+    y: event.clientY - bounds.top,
+  })
 
   event.dataTransfer.effectAllowed = "copy"
   setTransparentDragImage(event.dataTransfer)
@@ -161,8 +166,12 @@ function handleShapeInsertKeyDown(
   handleShapeInsert(shape, onShapeInsert)
 }
 
-function createShapeDragPayload(shape: CanvasNodeShape): ShapeDragPayload {
+function createShapeDragPayload(
+  shape: CanvasNodeShape,
+  grabOffset: ShapeDragPosition = { x: 0, y: 0 }
+): ShapeDragPayload {
   return {
+    grabOffset,
     shape,
     size: DEFAULT_SHAPE_SIZES[shape],
   }
@@ -178,7 +187,18 @@ function isShapeDragPayload(value: unknown): value is ShapeDragPayload {
   }
 
   return isPositiveFiniteNumber(value.size.width) &&
-    isPositiveFiniteNumber(value.size.height)
+    isPositiveFiniteNumber(value.size.height) &&
+    isDragOffset(value.grabOffset)
+}
+
+function isDragOffset(value: unknown): value is ShapeDragPosition {
+  return (
+    isRecord(value) &&
+    typeof value.x === "number" &&
+    Number.isFinite(value.x) &&
+    typeof value.y === "number" &&
+    Number.isFinite(value.y)
+  )
 }
 
 function isCanvasNodeShape(value: unknown): value is CanvasNodeShape {

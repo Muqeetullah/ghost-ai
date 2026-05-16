@@ -15,6 +15,7 @@ interface EditorNavbarProps {
   centerContent?: ReactNode
   actions?: ReactNode
   className?: string
+  showUserButton?: boolean
 }
 
 export function EditorNavbar({
@@ -23,6 +24,7 @@ export function EditorNavbar({
   centerContent,
   actions,
   className,
+  showUserButton = true,
 }: EditorNavbarProps) {
   const SidebarIcon = isSidebarOpen ? PanelLeftClose : PanelLeftOpen
   const toggleLabel = isSidebarOpen ? "Close project sidebar" : "Open project sidebar"
@@ -54,10 +56,12 @@ export function EditorNavbar({
 
       <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
         {actions}
-        <UserButton
-          appearance={clerkUserButtonAppearance}
-          userProfileMode="modal"
-        />
+        {showUserButton ? (
+          <UserButton
+            appearance={clerkUserButtonAppearance}
+            userProfileMode="modal"
+          />
+        ) : null}
       </div>
     </header>
   )
