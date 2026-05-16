@@ -3,8 +3,10 @@
 import {
   Component,
   useCallback,
+  useEffect,
   useRef,
-  type DragEvent,
+  useState,
+  type DragEvent as ReactDragEvent,
   type ErrorInfo,
   type ReactNode,
 } from "react"
@@ -26,11 +28,15 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react"
 
-import { CanvasNodeRenderer } from "@/components/editor/canvas-node"
+import {
+  CanvasNodeRenderer,
+  NodeShapeSurface,
+} from "@/components/editor/canvas-node"
 import {
   CanvasShapePanel,
   hasShapeDragPayload,
   readShapeDragPayload,
+  type ShapeDragPayload,
 } from "@/components/editor/shape-panel"
 import {
   CANVAS_NODE_TYPE,
@@ -62,6 +68,14 @@ interface CanvasRoomProps {
   roomId: string
 }
 
+interface ShapeDragPreview {
+  payload: ShapeDragPayload
+  position: {
+    x: number
+    y: number
+  }
+}
+
 export function CanvasRoom({ roomId }: CanvasRoomProps) {
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
@@ -83,6 +97,8 @@ function CanvasFlow() {
   const flowInstanceRef =
     useRef<ReactFlowInstance<CanvasNode, CanvasEdge> | null>(null)
   const nodeCounterRef = useRef(0)
+  const [shapeDragPreview, setShapeDragPreview] =
+    useState<ShapeDragPreview | null>(null)
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
@@ -101,48 +117,154 @@ function CanvasFlow() {
     []
   )
 
-  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (!hasShapeDragPayload(event.dataTransfer)) {
+  const clearShapeDragPreview = useCallback(() => {
+    setShapeDragPreview(null)
+  }, [])
+
+  const updateShapeDragPreviewPosition = useCallback(
+    (position: ShapeDragPreview["position"]) => {
+      setShapeDragPreview((currentPreview) => {
+        if (!currentPreview) {
+          return currentPreview
+        }
+
+        return {
+          ...currentPreview,
+          position,
+        }
+      })
+    },
+    []
+  )
+
+  const handleShapeDragStart = useCallback(
+    (
+      payload: ShapeDragPayload,
+      position: ShapeDragPreview["position"]
+    ) => {
+      setShapeDragPreview({ payload, position })
+    },
+    []
+  )
+
+  const addShapeNode = useCallback(
+    (payload: ShapeDragPayload, position: CanvasNode["position"]) => {
+      const flowInstance = flowInstanceRef.current
+
+      if (!flowInstance) {
+        return
+      }
+
+      nodeCounterRef.current += 1
+
+      const node: CanvasNode = {
+        id: `${payload.shape}-${Date.now()}-${nodeCounterRef.current}`,
+        type: CANVAS_NODE_TYPE,
+        position,
+        width: payload.size.width,
+        height: payload.size.height,
+        initialWidth: payload.size.width,
+        initialHeight: payload.size.height,
+        data: {
+          label: "",
+          color: DEFAULT_NODE_COLOR,
+          shape: payload.shape,
+        },
+      }
+
+      flowInstance.addNodes(node)
+    },
+    []
+  )
+
+  const handleShapeInsert = useCallback(
+    (payload: ShapeDragPayload) => {
+      const flowInstance = flowInstanceRef.current
+
+      if (!flowInstance) {
+        return
+      }
+
+      const centerPosition = flowInstance.screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      })
+
+      addShapeNode(payload, {
+        x: centerPosition.x - payload.size.width / 2,
+        y: centerPosition.y - payload.size.height / 2,
+      })
+    },
+    [addShapeNode]
+  )
+
+  const isShapeDragPreviewVisible = shapeDragPreview !== null
+
+  useEffect(() => {
+    if (!isShapeDragPreviewVisible) {
       return
     }
 
-    event.preventDefault()
-    event.dataTransfer.dropEffect = "copy"
-  }, [])
-
-  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
-    const payload = readShapeDragPayload(event.dataTransfer)
-    const flowInstance = flowInstanceRef.current
-
-    if (!payload || !flowInstance) {
-      return
+    function handleWindowDragOver(event: globalThis.DragEvent) {
+      updateShapeDragPreviewPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
     }
 
-    event.preventDefault()
-    nodeCounterRef.current += 1
+    window.addEventListener("dragover", handleWindowDragOver)
+    window.addEventListener("drop", clearShapeDragPreview)
+    window.addEventListener("blur", clearShapeDragPreview)
 
-    const position = flowInstance.screenToFlowPosition({
-      x: event.clientX,
-      y: event.clientY,
-    })
-
-    const node: CanvasNode = {
-      id: `${payload.shape}-${Date.now()}-${nodeCounterRef.current}`,
-      type: CANVAS_NODE_TYPE,
-      position,
-      width: payload.size.width,
-      height: payload.size.height,
-      initialWidth: payload.size.width,
-      initialHeight: payload.size.height,
-      data: {
-        label: "",
-        color: DEFAULT_NODE_COLOR,
-        shape: payload.shape,
-      },
+    return () => {
+      window.removeEventListener("dragover", handleWindowDragOver)
+      window.removeEventListener("drop", clearShapeDragPreview)
+      window.removeEventListener("blur", clearShapeDragPreview)
     }
+  }, [
+    clearShapeDragPreview,
+    isShapeDragPreviewVisible,
+    updateShapeDragPreviewPosition,
+  ])
 
-    flowInstance.addNodes(node)
-  }, [])
+  const handleDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!hasShapeDragPayload(event.dataTransfer)) {
+        return
+      }
+
+      event.preventDefault()
+      event.dataTransfer.dropEffect = "copy"
+      updateShapeDragPreviewPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+    },
+    [updateShapeDragPreviewPosition]
+  )
+
+  const handleDrop = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      const payload = readShapeDragPayload(event.dataTransfer)
+      const flowInstance = flowInstanceRef.current
+
+      clearShapeDragPreview()
+
+      if (!payload || !flowInstance) {
+        return
+      }
+
+      event.preventDefault()
+
+      const position = flowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+
+      addShapeNode(payload, position)
+    },
+    [addShapeNode, clearShapeDragPreview]
+  )
 
   return (
     <ReactFlow<CanvasNode, CanvasEdge>
@@ -178,8 +300,44 @@ function CanvasFlow() {
         className="rounded-xl border border-surface-border bg-bg-surface shadow-2xl"
       />
       <Cursors />
-      <CanvasShapePanel />
+      <CanvasShapeDragPreview preview={shapeDragPreview} />
+      <CanvasShapePanel
+        onShapeDragStart={handleShapeDragStart}
+        onShapeDragEnd={clearShapeDragPreview}
+        onShapeInsert={handleShapeInsert}
+      />
     </ReactFlow>
+  )
+}
+
+interface CanvasShapeDragPreviewProps {
+  preview: ShapeDragPreview | null
+}
+
+function CanvasShapeDragPreview({ preview }: CanvasShapeDragPreviewProps) {
+  if (!preview) {
+    return null
+  }
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 opacity-80"
+      style={{
+        left: preview.position.x,
+        top: preview.position.y,
+        width: preview.payload.size.width,
+        height: preview.payload.size.height,
+      }}
+    >
+      <NodeShapeSurface
+        shape={preview.payload.shape}
+        fill={DEFAULT_NODE_COLOR.fill}
+        stroke="var(--accent-primary)"
+        text={DEFAULT_NODE_COLOR.text}
+        selected
+      />
+    </div>
   )
 }
 

@@ -1,4 +1,4 @@
-import type { DragEvent } from "react"
+import type { DragEvent, KeyboardEvent } from "react"
 import {
   Circle,
   Cylinder,
@@ -25,6 +25,20 @@ export interface ShapeDragPayload {
   size: ShapeSize
 }
 
+interface ShapeDragPosition {
+  x: number
+  y: number
+}
+
+interface CanvasShapePanelProps {
+  onShapeDragStart?: (
+    payload: ShapeDragPayload,
+    position: ShapeDragPosition
+  ) => void
+  onShapeDragEnd?: () => void
+  onShapeInsert?: (payload: ShapeDragPayload) => void
+}
+
 const DEFAULT_SHAPE_SIZES = {
   rectangle: { width: 176, height: 88 },
   diamond: { width: 144, height: 144 },
@@ -47,7 +61,11 @@ const SHAPE_CONTROLS = [
   Icon: LucideIcon
 }>
 
-export function CanvasShapePanel() {
+export function CanvasShapePanel({
+  onShapeDragStart,
+  onShapeDragEnd,
+  onShapeInsert,
+}: CanvasShapePanelProps) {
   return (
     <Panel position="bottom-center" className="pointer-events-auto !m-4">
       <div className="flex items-center gap-1 rounded-full border border-surface-border bg-sidebar p-1.5 shadow-2xl backdrop-blur-xl">
@@ -60,7 +78,14 @@ export function CanvasShapePanel() {
             draggable
             aria-label={`Drag ${label} shape`}
             title={label}
-            onDragStart={(event) => handleShapeDragStart(event, shape)}
+            onDragStart={(event) =>
+              handleShapeDragStart(event, shape, onShapeDragStart)
+            }
+            onDragEnd={onShapeDragEnd}
+            onClick={() => handleShapeInsert(shape, onShapeInsert)}
+            onKeyDown={(event) =>
+              handleShapeInsertKeyDown(event, shape, onShapeInsert)
+            }
             className="cursor-grab rounded-full text-copy-muted hover:bg-bg-subtle hover:text-copy-primary active:cursor-grabbing"
           >
             <Icon className="h-4 w-4" />
@@ -101,16 +126,46 @@ export function readShapeDragPayload(
 
 function handleShapeDragStart(
   event: DragEvent<HTMLButtonElement>,
-  shape: CanvasNodeShape
+  shape: CanvasNodeShape,
+  onShapeDragStart?: CanvasShapePanelProps["onShapeDragStart"]
 ) {
-  const payload: ShapeDragPayload = {
+  const payload = createShapeDragPayload(shape)
+
+  event.dataTransfer.effectAllowed = "copy"
+  setTransparentDragImage(event.dataTransfer)
+  event.dataTransfer.setData(SHAPE_DRAG_MIME_TYPE, JSON.stringify(payload))
+  event.dataTransfer.setData("text/plain", shape)
+  onShapeDragStart?.(payload, {
+    x: event.clientX,
+    y: event.clientY,
+  })
+}
+
+function handleShapeInsert(
+  shape: CanvasNodeShape,
+  onShapeInsert?: CanvasShapePanelProps["onShapeInsert"]
+) {
+  onShapeInsert?.(createShapeDragPayload(shape))
+}
+
+function handleShapeInsertKeyDown(
+  event: KeyboardEvent<HTMLButtonElement>,
+  shape: CanvasNodeShape,
+  onShapeInsert?: CanvasShapePanelProps["onShapeInsert"]
+) {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return
+  }
+
+  event.preventDefault()
+  handleShapeInsert(shape, onShapeInsert)
+}
+
+function createShapeDragPayload(shape: CanvasNodeShape): ShapeDragPayload {
+  return {
     shape,
     size: DEFAULT_SHAPE_SIZES[shape],
   }
-
-  event.dataTransfer.effectAllowed = "copy"
-  event.dataTransfer.setData(SHAPE_DRAG_MIME_TYPE, JSON.stringify(payload))
-  event.dataTransfer.setData("text/plain", shape)
 }
 
 function isShapeDragPayload(value: unknown): value is ShapeDragPayload {
@@ -139,4 +194,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isPositiveFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0
+}
+
+function setTransparentDragImage(dataTransfer: DataTransfer) {
+  const dragImage = document.createElement("span")
+
+  dragImage.style.position = "fixed"
+  dragImage.style.top = "0"
+  dragImage.style.left = "0"
+  dragImage.style.width = "1px"
+  dragImage.style.height = "1px"
+  dragImage.style.opacity = "0"
+
+  document.body.appendChild(dragImage)
+  dataTransfer.setDragImage(dragImage, 0, 0)
+
+  window.setTimeout(() => {
+    dragImage.remove()
+  }, 0)
 }
