@@ -1,4 +1,4 @@
-import { logger, task } from "@trigger.dev/sdk/v3";
+import { logger, task } from "@trigger.dev/sdk";
 
 interface TriggerHealthCheckPayload {
   source?: string;
@@ -6,9 +6,9 @@ interface TriggerHealthCheckPayload {
 
 export const triggerHealthCheck = task({
   id: "trigger-health-check",
-  run: async (payload: TriggerHealthCheckPayload) => {
+  run: async (payload?: TriggerHealthCheckPayload) => {
     const checkedAt = new Date().toISOString();
-    const source = payload.source ?? "manual";
+    const source = payload?.source ?? "manual";
 
     logger.info("Trigger.dev health check completed", {
       checkedAt,

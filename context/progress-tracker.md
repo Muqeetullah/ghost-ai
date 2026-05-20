@@ -8,11 +8,14 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Await the next scoped feature from the project context.
+- Resolve verified Trigger.dev and Liveblocks review findings.
 
 ## Completed
 
+- Verified review fixes for Trigger.dev and Liveblocks flows: updated Trigger imports to the package root, added design prompt length validation, made design-agent triggering idempotent with DB-persistence failure cleanup, removed raw prompt logging, added fatal-error retry abortion, guarded health-check payload access, handled Liveblocks feed creation errors explicitly, aligned the chat feed ID to `ai-chat-feed`, and updated the related chat specs.
+- Backend spec generation flow from `context/feature-specs/27-spec-generation-flow.md`: added authenticated `POST /api/ai/spec` run triggering from `roomId`-derived project access, added owner-verified `POST /api/ai/spec/token` with 1-hour Trigger public tokens, added shared Zod payload validation for spec requests/tasks, created the Gemini-backed `generate-spec` Trigger task with Prisma project context loading plus metadata/logging/error handling, and kept task output as plain Markdown without persisting the final spec in this unit.
 - Database connection strategy fix: runtime Prisma connections now auto-switch legacy Prisma Postgres direct `db.prisma.io` URLs to `pooled.db.prisma.io`, preserve `sslmode=require` with `uselibpqcompat=true`, and Prisma CLI config now prefers `DIRECT_URL`/`DIRECT_DATABASE_URL` for migrations and admin commands.
+
 - Database unavailable handling: editor routes now catch Prisma database connection failures and render a controlled database-unavailable state instead of surfacing a raw `prisma.project.findUnique()` error screen when `db.prisma.io` cannot be reached.
 - Live cursor UI polish: remote canvas cursors now use a sharper outlined pointer, compact glass name badge, participant avatar/initial chip, trimmed email-style display names, and a subtler thinking spinner treatment.
 - Edge label editing: custom React Flow edges now open an inline label input on double-clicking the edge path or label pill, show a faint selected-edge label hint, and save edited labels through the existing edge update flow on blur, Enter, or Escape.

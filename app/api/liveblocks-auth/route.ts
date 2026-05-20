@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server"
 
 import { jsonError } from "@/app/api/projects/_lib/project-api"
+import { ensureLiveblocksFeed } from "@/lib/liveblocks-feeds"
 import { getLiveblocksClient, getLiveblocksUserColor } from "@/lib/liveblocks"
 import {
   getAccessibleProject,
@@ -42,23 +43,19 @@ export async function POST(request: Request) {
       projectName: project.name,
     },
   })
-  await liveblocks.createFeed({
-    roomId: project.id,
+  await ensureLiveblocksFeed(liveblocks, {
     feedId: AI_STATUS_FEED_ID,
     metadata: {
       name: "AI status feed",
     },
-  }).catch(() => {
-    // The room-scoped feed may already exist.
-  })
-  await liveblocks.createFeed({
     roomId: project.id,
+  })
+  await ensureLiveblocksFeed(liveblocks, {
     feedId: AI_CHAT_FEED_ID,
     metadata: {
       name: "AI chat feed",
     },
-  }).catch(() => {
-    // The room-scoped feed may already exist.
+    roomId: project.id,
   })
 
   const user = await currentUser()

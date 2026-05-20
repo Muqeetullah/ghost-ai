@@ -1,5 +1,5 @@
 import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
-import { defineConfig } from "@trigger.dev/sdk/v3";
+import { defineConfig } from "@trigger.dev/sdk";
 
 const projectRef = process.env.TRIGGER_PROJECT_REF ?? "proj_ghost_ai";
 

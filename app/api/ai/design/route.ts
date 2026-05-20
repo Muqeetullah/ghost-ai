@@ -1,4 +1,6 @@
-import { tasks } from "@trigger.dev/sdk/v3";
+import { createHash } from "node:crypto";
+
+import { idempotencyKeys, runs, tasks } from "@trigger.dev/sdk";
 
 import { jsonError } from "@/app/api/projects/_lib/project-api";
 import { prisma } from "@/lib/prisma";
@@ -13,6 +15,9 @@ interface DesignRequestBody {
   projectId: string;
   roomId: string;
 }
+
+const MAX_PROMPT_LENGTH = 2000;
+const DESIGN_IDEMPOTENCY_KEY_TTL = "1h";
 
 export async function POST(request: Request) {
   const body = await parseDesignRequest(request);
@@ -40,19 +45,67 @@ export async function POST(request: Request) {
     return jsonError("Room does not match project", 400);
   }
 
-  const handle = await tasks.trigger<typeof designAgent>("design-agent", {
-    projectId: project.id,
-    prompt: body.prompt,
-    roomId: body.roomId,
-  });
+  const idempotencyKey = await idempotencyKeys.create(
+    [
+      "design-agent",
+      "project",
+      project.id,
+      "user",
+      identity.userId,
+      "payload",
+      hashDesignRequest({
+        projectId: project.id,
+        prompt: body.prompt,
+        roomId: body.roomId,
+      }),
+    ],
+    { scope: "global" }
+  );
 
-  await prisma.taskRun.create({
-    data: {
-      runId: handle.id,
+  const handle = await tasks.trigger<typeof designAgent>(
+    "design-agent",
+    {
       projectId: project.id,
-      userId: identity.userId,
+      prompt: body.prompt,
+      roomId: body.roomId,
     },
-  });
+    {
+      idempotencyKey,
+      idempotencyKeyTTL: DESIGN_IDEMPOTENCY_KEY_TTL,
+    }
+  );
+
+  try {
+    await prisma.taskRun.create({
+      data: {
+        runId: handle.id,
+        projectId: project.id,
+        userId: identity.userId,
+      },
+    });
+  } catch (error) {
+    if (isPrismaUniqueConstraintError(error)) {
+      return Response.json({ runId: handle.id }, { status: 201 });
+    }
+
+    console.error("Failed to persist design-agent task run", {
+      error,
+      projectId: project.id,
+      runId: handle.id,
+      userId: identity.userId,
+    });
+
+    try {
+      await runs.cancel(handle.id);
+    } catch (cancelError) {
+      console.error("Failed to cancel untracked design-agent run", {
+        error: cancelError,
+        runId: handle.id,
+      });
+    }
+
+    return jsonError("Unable to persist design run", 500);
+  }
 
   return Response.json({ runId: handle.id }, { status: 201 });
 }
@@ -80,6 +133,13 @@ async function parseDesignRequest(
     return jsonError("Design prompt is required", 400);
   }
 
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    return jsonError(
+      `Design prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters`,
+      400
+    );
+  }
+
   if (!projectId) {
     return jsonError("Project ID is required", 400);
   }
@@ -93,6 +153,19 @@ async function parseDesignRequest(
 
 function parseRequiredString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function hashDesignRequest(value: DesignRequestBody) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function isPrismaUniqueConstraintError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,7 +1,7 @@
 import type { JsonObject } from "@liveblocks/client"
 import { z } from "zod"
 
-export const AI_CHAT_FEED_ID = "ai-chat"
+export const AI_CHAT_FEED_ID = "ai-chat-feed"
 export const AI_STATUS_FEED_ID = "ai-status-feed"
 
 export type AiStatusKind = "start" | "processing" | "complete" | "error"

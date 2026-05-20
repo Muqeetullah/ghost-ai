@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto"
+
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { Liveblocks } from "@liveblocks/node"
 import { mutateFlow, type MutableFlow } from "@liveblocks/react-flow/node"
-import { logger, metadata, task } from "@trigger.dev/sdk/v3"
+import { AbortTaskRunError, logger, metadata, task } from "@trigger.dev/sdk"
 import { generateText, jsonSchema, stepCountIs, tool } from "ai"
 
+import { ensureLiveblocksFeed } from "@/lib/liveblocks-feeds"
 import { prisma } from "@/lib/prisma"
 import {
   AI_DESIGN_AGENT_INFO,
@@ -147,6 +150,7 @@ const MIN_NODE_WIDTH = 96
 const MIN_NODE_HEIGHT = 56
 const MAX_NODE_WIDTH = 360
 const MAX_NODE_HEIGHT = 240
+const AI_RUN_ID_DATA_KEY = "aiRunId"
 
 const liveblocksGlobal = globalThis as typeof globalThis & {
   designAgentLiveblocks?: Liveblocks
@@ -312,7 +316,7 @@ const designAgentTools = {
 
 export const designAgent = task({
   id: "design-agent",
-  run: async (payload: DesignAgentPayload) => {
+  run: async (payload: DesignAgentPayload, { ctx }) => {
     const payloadKeys = getPayloadKeys(payload)
     let liveblocks: Liveblocks | null = null
     let projectId = ""
@@ -329,11 +333,15 @@ export const designAgent = task({
       prompt = normalizedPayload.prompt
       roomId = normalizedPayload.roomId
       liveblocks = getDesignAgentLiveblocksClient()
+      const promptHash = hashPrompt(prompt)
+      const runIdempotencyKey = ctx.run.idempotencyKey ?? ctx.run.id
 
       logger.info("Design agent task started", {
         payloadKeys,
         projectId,
-        prompt,
+        promptHash,
+        promptLength: prompt.length,
+        runId: ctx.run.id,
         roomId,
       })
 
@@ -399,7 +407,8 @@ export const designAgent = task({
       const applyResult = await applyDesignPlan(
         liveblocks,
         roomId,
-        plan.actions
+        plan.actions,
+        runIdempotencyKey
       )
 
       metadata
@@ -452,6 +461,11 @@ export const designAgent = task({
       if (roomReady && liveblocks) {
         await clearAiPresence(liveblocks, roomId)
       }
+    }
+  },
+  catchError: ({ error }) => {
+    if (isFatalDesignAgentError(error)) {
+      throw new AbortTaskRunError(getErrorMessage(error))
     }
   },
 })
@@ -509,6 +523,10 @@ function parseDesignAgentPayload(
 
 function parseRequiredString(value: unknown) {
   return typeof value === "string" ? value.trim() : ""
+}
+
+function hashPrompt(prompt: string) {
+  return createHash("sha256").update(prompt).digest("hex")
 }
 
 function readPayloadString(payload: Record<string, unknown>, keys: string[]) {
@@ -966,7 +984,8 @@ function inferEdgeRepairLabel(sourceLabel: string, targetLabel: string) {
 async function applyDesignPlan(
   liveblocks: Liveblocks,
   roomId: string,
-  actions: DesignAgentAction[]
+  actions: DesignAgentAction[],
+  runIdempotencyKey: string
 ): Promise<DesignAgentApplyResult> {
   let appliedActions = 0
   let skippedActions = 0
@@ -977,6 +996,11 @@ async function applyDesignPlan(
       roomId,
     },
     (flow) => {
+      if (hasAppliedDesignRun(flow, runIdempotencyKey)) {
+        skippedActions = actions.length
+        return
+      }
+
       const nodeAliases = new Map<string, string>()
       const edgeAliases = new Map<string, string>()
 
@@ -986,6 +1010,7 @@ async function applyDesignPlan(
           edgeAliases,
           flow,
           nodeAliases,
+          runIdempotencyKey,
           sequence: index + 1,
         })
 
@@ -1001,17 +1026,26 @@ async function applyDesignPlan(
   return { appliedActions, skippedActions }
 }
 
+function hasAppliedDesignRun(flow: CanvasMutableFlow, runIdempotencyKey: string) {
+  return (
+    flow.nodes.some((node) => node.data[AI_RUN_ID_DATA_KEY] === runIdempotencyKey) ||
+    flow.edges.some((edge) => edge.data?.[AI_RUN_ID_DATA_KEY] === runIdempotencyKey)
+  )
+}
+
 function applyDesignAction({
   action,
   edgeAliases,
   flow,
   nodeAliases,
+  runIdempotencyKey,
   sequence,
 }: {
   action: DesignAgentAction
   edgeAliases: Map<string, string>
   flow: CanvasMutableFlow
   nodeAliases: Map<string, string>
+  runIdempotencyKey: string
   sequence: number
 }) {
   switch (action.type) {
@@ -1023,6 +1057,7 @@ function applyDesignAction({
       const color = getNodeColor(action.colorIndex)
       const node: CanvasNode = {
         data: {
+          [AI_RUN_ID_DATA_KEY]: runIdempotencyKey,
           color,
           label: normalizeLabel(action.label),
           shape,
@@ -1102,6 +1137,7 @@ function applyDesignAction({
       }
 
       flow.updateNodeData(nodeId, {
+        [AI_RUN_ID_DATA_KEY]: runIdempotencyKey,
         color: getNodeColor(action.colorIndex, existingNode.data.color),
         label:
           typeof action.label === "string"
@@ -1147,7 +1183,9 @@ function applyDesignAction({
         sequence
       )
       const edge: CanvasEdge = {
-        data: {},
+        data: {
+          [AI_RUN_ID_DATA_KEY]: runIdempotencyKey,
+        },
         id: edgeId,
         label: action.label ? normalizeLabel(action.label) : undefined,
         source: sourceId,
@@ -1342,17 +1380,13 @@ async function publishStatus(
 }
 
 async function ensureAiStatusFeed(liveblocks: Liveblocks, roomId: string) {
-  try {
-    await liveblocks.createFeed({
-      roomId,
-      feedId: AI_STATUS_FEED_ID,
-      metadata: {
-        name: "AI status feed",
-      },
-    })
-  } catch {
-    // The room-scoped feed can already exist from a previous sidebar session.
-  }
+  await ensureLiveblocksFeed(liveblocks, {
+    feedId: AI_STATUS_FEED_ID,
+    metadata: {
+      name: "AI status feed",
+    },
+    roomId,
+  })
 }
 
 async function setAiPresence(
@@ -1544,4 +1578,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error"
+}
+
+function isFatalDesignAgentError(error: unknown) {
+  const message = getErrorMessage(error).toLowerCase()
+
+  return [
+    "design agent payload must be",
+    "design prompt is required",
+    "project or room id is required",
+    "room does not match project",
+    "project not found",
+    "liveblocks_secret_key is required",
+    "google_ai_api_key is required",
+    "no valid canvas actions generated",
+  ].some((fatalMessage) => message.includes(fatalMessage))
 }

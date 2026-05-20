@@ -1,4 +1,4 @@
-import { auth as triggerAuth } from "@trigger.dev/sdk/v3";
+import { auth as triggerAuth } from "@trigger.dev/sdk";
 
 import { jsonError } from "@/app/api/projects/_lib/project-api";
 import { prisma } from "@/lib/prisma";
