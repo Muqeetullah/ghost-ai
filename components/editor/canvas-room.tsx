@@ -13,15 +13,12 @@ import {
 } from "react"
 import { UserButton, useUser } from "@clerk/nextjs"
 import { shallow } from "@liveblocks/client"
-import {
-  ClientSideSuspense,
-  LiveblocksProvider,
-  RoomProvider,
-} from "@liveblocks/react/suspense"
+import { ClientSideSuspense } from "@liveblocks/react/suspense"
 import { useLiveblocksFlow } from "@liveblocks/react-flow"
 import {
   useCanRedo,
   useCanUndo,
+  useFeedMessages,
   useOthers,
   useRedo,
   useUndo,
@@ -43,7 +40,17 @@ import {
   useEdges,
   useNodes,
 } from "@xyflow/react"
-import { Maximize2, Redo2, Undo2, ZoomIn, ZoomOut } from "lucide-react"
+import {
+  AlertCircle,
+  Bot,
+  CheckCircle2,
+  LoaderCircle,
+  Maximize2,
+  Redo2,
+  Undo2,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react"
 
 import { CanvasEdgeRenderer } from "@/components/editor/canvas-edge"
 import {
@@ -76,7 +83,11 @@ import {
   type CanvasTemplateImport,
 } from "@/components/editor/starter-templates"
 import { clerkUserButtonAppearance } from "@/lib/clerk-appearance"
-import { cn } from "@/lib/utils"
+import {
+  AI_STATUS_FEED_ID,
+  getLatestAiStatusFeedPayload,
+  type AiStatusKind,
+} from "@/types/tasks"
 
 const initialNodes: CanvasNode[] = []
 const initialEdges: CanvasEdge[] = []
@@ -125,25 +136,18 @@ export function CanvasRoom({
   templateImport,
 }: CanvasRoomProps) {
   return (
-    <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
-      <RoomProvider
-        id={roomId}
-        initialPresence={{ cursor: null, thinking: false }}
-      >
-        <CanvasErrorBoundary key={roomId} fallback={<CanvasErrorState />}>
-          <ClientSideSuspense fallback={<CanvasLoadingState />}>
-            {() => (
-              <CanvasFlow
-                onSaveNowChange={onSaveNowChange}
-                onSaveStatusChange={onSaveStatusChange}
-                projectId={roomId}
-                templateImport={templateImport}
-              />
-            )}
-          </ClientSideSuspense>
-        </CanvasErrorBoundary>
-      </RoomProvider>
-    </LiveblocksProvider>
+    <CanvasErrorBoundary key={roomId} fallback={<CanvasErrorState />}>
+      <ClientSideSuspense fallback={<CanvasLoadingState />}>
+        {() => (
+          <CanvasFlow
+            onSaveNowChange={onSaveNowChange}
+            onSaveStatusChange={onSaveStatusChange}
+            projectId={roomId}
+            templateImport={templateImport}
+          />
+        )}
+      </ClientSideSuspense>
+    </CanvasErrorBoundary>
   )
 }
 
@@ -555,6 +559,7 @@ function CanvasFlow({
       />
       <CanvasPresenceGroup />
       <CanvasLiveCursors />
+      <CanvasAiStatusFeed />
       <CanvasShapeDragPreview preview={shapeDragPreview} />
       <CanvasControlBar
         canRedo={canRedo}
@@ -683,6 +688,7 @@ interface CollaboratorPresence {
   cursor: Liveblocks["Presence"]["cursor"]
   id: string
   name: string
+  thinking: boolean
 }
 
 function CanvasPresenceGroup() {
@@ -699,6 +705,7 @@ function CanvasPresenceGroup() {
           cursor: other.presence.cursor,
           id: other.id,
           name: other.info.name,
+          thinking: other.presence.thinking,
         })),
     shallow
   )
@@ -753,7 +760,9 @@ function CollaboratorAvatar({ collaborator }: CollaboratorAvatarProps) {
   return (
     <div
       className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-surface-border bg-bg-elevated text-xs font-semibold text-copy-primary ring-2 ring-bg-base"
-      aria-label={`${collaborator.name} is present`}
+      aria-label={`${collaborator.name} is ${
+        collaborator.thinking ? "thinking" : "present"
+      }`}
       title={collaborator.name}
     >
       {collaborator.avatar ? (
@@ -767,6 +776,12 @@ function CollaboratorAvatar({ collaborator }: CollaboratorAvatarProps) {
       ) : (
         <span aria-hidden="true">{initials}</span>
       )}
+      {collaborator.thinking ? (
+        <span
+          aria-hidden="true"
+          className="absolute right-0 bottom-0 h-2.5 w-2.5 rounded-full border border-bg-base bg-ai-text"
+        />
+      ) : null}
     </div>
   )
 }
@@ -785,6 +800,7 @@ function CanvasLiveCursors() {
           cursor: other.presence.cursor,
           id: other.id,
           name: other.info.name,
+          thinking: other.presence.thinking,
         })),
     shallow
   )
@@ -816,33 +832,109 @@ function ParticipantCursor({ participant }: ParticipantCursorProps) {
     return null
   }
 
+  const displayName = getCursorDisplayName(participant.name)
+  const initials = getInitials(displayName)
+
   return (
     <div
-      className="absolute flex items-start"
+      className="absolute"
       style={{
         left: participant.cursor.x,
         top: participant.cursor.y,
       }}
     >
-      <span
+      <svg
         aria-hidden="true"
-        className="h-4 w-4"
-        style={{
-          backgroundColor: participant.color,
-          clipPath: "polygon(0 0, 0 100%, 36% 72%, 58% 100%, 78% 90%, 56% 62%, 100% 62%)",
-        }}
-      />
-      <span
-        className={cn(
-          "ml-1.5 mt-3 max-w-36 truncate rounded-full px-2 py-0.5",
-          "text-xs font-medium leading-5 text-bg-base shadow-xl"
-        )}
-        style={{ backgroundColor: participant.color }}
+        className="h-5 w-5 drop-shadow-lg"
+        viewBox="0 0 24 24"
       >
-        {participant.name}
-      </span>
+        <path
+          d="M4.5 3.5L19 13.2L12.9 14.2L9.9 19.8L4.5 3.5Z"
+          fill={participant.color}
+          stroke="var(--bg-base)"
+          strokeLinejoin="round"
+          strokeWidth="2.5"
+        />
+        <path
+          d="M4.5 3.5L19 13.2L12.9 14.2L9.9 19.8L4.5 3.5Z"
+          fill="none"
+          stroke="var(--text-primary)"
+          strokeLinejoin="round"
+          strokeWidth="0.75"
+          opacity="0.72"
+        />
+      </svg>
+      <div
+        className="absolute left-4 top-1 flex max-w-48 items-center gap-2 rounded-xl border border-surface-border bg-sidebar px-2 py-1 text-xs font-medium leading-4 text-copy-primary shadow-2xl backdrop-blur-xl"
+        style={{
+          boxShadow: `0 0 0 1px ${participant.color}33, 0 12px 28px var(--overlay-backdrop)`,
+        }}
+      >
+        <span
+          className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-semibold text-bg-base"
+          style={{ backgroundColor: participant.color }}
+        >
+          {participant.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={participant.avatar}
+              alt=""
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span aria-hidden="true">{initials}</span>
+          )}
+        </span>
+        <span className="min-w-0 truncate">{displayName}</span>
+        {participant.thinking ? (
+          <LoaderCircle
+            aria-label={`${participant.name} is thinking`}
+            className="h-3 w-3 shrink-0 animate-spin text-ai-text"
+          />
+        ) : null}
+      </div>
     </div>
   )
+}
+
+function CanvasAiStatusFeed() {
+  const { messages } = useFeedMessages(AI_STATUS_FEED_ID)
+  const latestStatus = getLatestAiStatusFeedPayload(messages)
+
+  if (!latestStatus?.text) {
+    return null
+  }
+
+  return (
+    <Panel position="top-center" className="pointer-events-none !m-4">
+      <div
+        aria-live="polite"
+        className="w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-surface-border bg-sidebar p-2 shadow-2xl backdrop-blur-xl"
+      >
+        <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-semibold text-ai-text">
+          <Bot className="h-4 w-4" />
+          Ghost AI
+        </div>
+        <div className="flex items-start gap-2 rounded-xl bg-bg-elevated px-2 py-2 text-xs leading-5 text-copy-secondary">
+          <AiStatusIcon kind={latestStatus.kind} />
+          <span className="min-w-0 flex-1">{latestStatus.text}</span>
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
+function AiStatusIcon({ kind }: { kind: AiStatusKind }) {
+  if (kind === "complete") {
+    return <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-state-success" />
+  }
+
+  if (kind === "error") {
+    return <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-state-error" />
+  }
+
+  return <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-ai-text" />
 }
 
 function getInitials(name: string) {
@@ -854,6 +946,18 @@ function getInitials(name: string) {
     .join("")
 
   return initials || "?"
+}
+
+function getCursorDisplayName(name: string) {
+  const trimmedName = name.trim()
+
+  if (!trimmedName) {
+    return "Collaborator"
+  }
+
+  const [localPart] = trimmedName.split("@")
+
+  return localPart || trimmedName
 }
 
 interface CanvasControlBarProps {

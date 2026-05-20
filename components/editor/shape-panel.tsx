@@ -11,19 +11,18 @@ import {
 import { Panel } from "@xyflow/react"
 
 import { Button } from "@/components/ui/button"
-import type { CanvasNodeShape } from "@/types/canvas"
+import {
+  DEFAULT_NODE_SIZES,
+  type CanvasNodeShape,
+  type CanvasNodeSize,
+} from "@/types/canvas"
 
 export const SHAPE_DRAG_MIME_TYPE = "application/x-ghost-ai-shape"
-
-interface ShapeSize {
-  width: number
-  height: number
-}
 
 export interface ShapeDragPayload {
   grabOffset: ShapeDragPosition
   shape: CanvasNodeShape
-  size: ShapeSize
+  size: CanvasNodeSize
 }
 
 interface ShapeDragPosition {
@@ -39,15 +38,6 @@ interface CanvasShapePanelProps {
   onShapeDragEnd?: () => void
   onShapeInsert?: (payload: ShapeDragPayload) => void
 }
-
-const DEFAULT_SHAPE_SIZES = {
-  rectangle: { width: 176, height: 88 },
-  diamond: { width: 144, height: 144 },
-  circle: { width: 112, height: 112 },
-  pill: { width: 168, height: 72 },
-  cylinder: { width: 152, height: 96 },
-  hexagon: { width: 156, height: 96 },
-} satisfies Record<CanvasNodeShape, ShapeSize>
 
 const SHAPE_CONTROLS = [
   { shape: "rectangle", label: "Rectangle", Icon: RectangleHorizontal },
@@ -173,7 +163,7 @@ function createShapeDragPayload(
   return {
     grabOffset,
     shape,
-    size: DEFAULT_SHAPE_SIZES[shape],
+    size: DEFAULT_NODE_SIZES[shape],
   }
 }
 

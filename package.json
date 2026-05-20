@@ -6,9 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "trigger:dev": "trigger dev --env-file .env.local",
+    "trigger:deploy": "trigger deploy"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.75",
     "@clerk/nextjs": "^7.3.3",
     "@clerk/ui": "^1.9.1",
     "@liveblocks/client": "^3.19.1",
@@ -20,8 +23,11 @@
     "@prisma/client": "^7.8.0",
     "@prisma/extension-accelerate": "^3.0.1",
     "@radix-ui/react-slot": "^1.2.4",
+    "@trigger.dev/react-hooks": "^4.4.6",
+    "@trigger.dev/sdk": "^4.4.6",
     "@vercel/blob": "^2.3.3",
     "@xyflow/react": "^12.10.2",
+    "ai": "^6.0.185",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
@@ -37,6 +43,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@trigger.dev/build": "^4.4.6",
     "@types/node": "^20.19.41",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
@@ -45,6 +52,7 @@
     "eslint-config-next": "16.2.6",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
+    "trigger.dev": "^4.4.6",
     "tsx": "^4.22.0",
     "typescript": "^5"
   }

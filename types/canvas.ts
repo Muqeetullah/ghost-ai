@@ -25,9 +25,22 @@ export const NODE_SHAPES = [
 
 export const DEFAULT_NODE_COLOR = NODE_COLORS[0]
 export const DEFAULT_NODE_SHAPE = NODE_SHAPES[0]
+export const DEFAULT_NODE_SIZES = {
+  rectangle: { width: 176, height: 88 },
+  diamond: { width: 144, height: 144 },
+  circle: { width: 112, height: 112 },
+  pill: { width: 168, height: 72 },
+  cylinder: { width: 152, height: 96 },
+  hexagon: { width: 156, height: 96 },
+} as const satisfies Record<CanvasNodeShape, CanvasNodeSize>
 
 export type CanvasNodeColor = (typeof NODE_COLORS)[number]
 export type CanvasNodeShape = (typeof NODE_SHAPES)[number]
+
+export interface CanvasNodeSize {
+  width: number
+  height: number
+}
 
 export interface CanvasNodeData extends Record<string, unknown> {
   label: string

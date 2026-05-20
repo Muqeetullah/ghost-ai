@@ -19,7 +19,9 @@ function createPrismaClient(databaseUrl: string) {
     }).$extends(withAccelerate());
   }
 
-  const adapter = new PrismaPg({ connectionString: databaseUrl });
+  const adapter = new PrismaPg({
+    connectionString: normalizeRuntimePgUrl(databaseUrl),
+  });
 
   return new PrismaClient({
     adapter,
@@ -28,6 +30,25 @@ function createPrismaClient(databaseUrl: string) {
 
 function isAccelerateUrl(databaseUrl: string) {
   return databaseUrl.startsWith("prisma://") || databaseUrl.startsWith("prisma+postgres://");
+}
+
+function normalizeRuntimePgUrl(databaseUrl: string) {
+  const parsedUrl = new URL(databaseUrl);
+
+  if (parsedUrl.hostname === "db.prisma.io") {
+    parsedUrl.hostname = "pooled.db.prisma.io";
+  }
+
+  if (
+    (parsedUrl.hostname === "db.prisma.io" ||
+      parsedUrl.hostname === "pooled.db.prisma.io") &&
+    parsedUrl.searchParams.get("sslmode") === "require" &&
+    !parsedUrl.searchParams.has("uselibpqcompat")
+  ) {
+    parsedUrl.searchParams.set("uselibpqcompat", "true");
+  }
+
+  return parsedUrl.toString();
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient(connectionString);

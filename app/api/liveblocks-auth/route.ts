@@ -1,11 +1,13 @@
 import { currentUser } from "@clerk/nextjs/server"
 
 import { jsonError } from "@/app/api/projects/_lib/project-api"
+import { ensureLiveblocksFeed } from "@/lib/liveblocks-feeds"
 import { getLiveblocksClient, getLiveblocksUserColor } from "@/lib/liveblocks"
 import {
   getAccessibleProject,
   getCurrentClerkIdentity,
 } from "@/lib/project-access"
+import { AI_CHAT_FEED_ID, AI_STATUS_FEED_ID } from "@/types/tasks"
 
 interface LiveblocksAuthRequest {
   room: string
@@ -40,6 +42,20 @@ export async function POST(request: Request) {
       projectId: project.id,
       projectName: project.name,
     },
+  })
+  await ensureLiveblocksFeed(liveblocks, {
+    feedId: AI_STATUS_FEED_ID,
+    metadata: {
+      name: "AI status feed",
+    },
+    roomId: project.id,
+  })
+  await ensureLiveblocksFeed(liveblocks, {
+    feedId: AI_CHAT_FEED_ID,
+    metadata: {
+      name: "AI chat feed",
+    },
+    roomId: project.id,
   })
 
   const user = await currentUser()
