@@ -1,6 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  LiveblocksProvider,
+  RoomProvider,
+} from "@liveblocks/react/suspense"
 import { Bot, LayoutTemplate, Save, Share2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -130,19 +134,27 @@ export function WorkspaceShell({
         onDeleteProject={projectActions.openDeleteDialog}
       />
 
-      <main className="relative min-h-0 flex-1 overflow-hidden bg-base">
-        <CanvasRoom
-          onSaveNowChange={handleSaveNowChange}
-          onSaveStatusChange={setCanvasSaveStatus}
-          roomId={project.id}
-          templateImport={templateImport}
-        />
-      </main>
+      <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
+        <RoomProvider
+          id={project.id}
+          initialPresence={{ cursor: null, thinking: false }}
+        >
+          <main className="relative min-h-0 flex-1 overflow-hidden bg-base">
+            <CanvasRoom
+              onSaveNowChange={handleSaveNowChange}
+              onSaveStatusChange={setCanvasSaveStatus}
+              roomId={project.id}
+              templateImport={templateImport}
+            />
+          </main>
 
-      <AiSidebar
-        isOpen={isAiSidebarOpen}
-        onClose={() => setIsAiSidebarOpen(false)}
-      />
+          <AiSidebar
+            isOpen={isAiSidebarOpen}
+            onClose={() => setIsAiSidebarOpen(false)}
+            roomId={project.id}
+          />
+        </RoomProvider>
+      </LiveblocksProvider>
 
       <ProjectDialogs
         activeDialog={projectActions.activeDialog}

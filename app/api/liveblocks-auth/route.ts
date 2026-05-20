@@ -6,6 +6,7 @@ import {
   getAccessibleProject,
   getCurrentClerkIdentity,
 } from "@/lib/project-access"
+import { AI_CHAT_FEED_ID, AI_STATUS_FEED_ID } from "@/types/tasks"
 
 interface LiveblocksAuthRequest {
   room: string
@@ -40,6 +41,24 @@ export async function POST(request: Request) {
       projectId: project.id,
       projectName: project.name,
     },
+  })
+  await liveblocks.createFeed({
+    roomId: project.id,
+    feedId: AI_STATUS_FEED_ID,
+    metadata: {
+      name: "AI status feed",
+    },
+  }).catch(() => {
+    // The room-scoped feed may already exist.
+  })
+  await liveblocks.createFeed({
+    roomId: project.id,
+    feedId: AI_CHAT_FEED_ID,
+    metadata: {
+      name: "AI chat feed",
+    },
+  }).catch(() => {
+    // The room-scoped feed may already exist.
   })
 
   const user = await currentUser()

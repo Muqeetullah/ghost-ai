@@ -16,6 +16,34 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Database
+
+For Prisma Postgres, use the pooled runtime connection for `DATABASE_URL` and keep the direct hostname for CLI and migrations:
+
+```bash
+DATABASE_URL=postgres://USER:PASSWORD@pooled.db.prisma.io:5432/postgres?sslmode=require
+DIRECT_URL=postgres://USER:PASSWORD@db.prisma.io:5432/postgres?sslmode=require
+```
+
+Ghost AI will also auto-upgrade a legacy direct `DATABASE_URL` (`db.prisma.io`) to the pooled runtime host in app code so the editor keeps using the safer application path while Prisma CLI continues to work with `DIRECT_URL`.
+
+## Trigger.dev
+
+Set the Trigger.dev project values in `.env.local`:
+
+```bash
+TRIGGER_PROJECT_REF=proj_your_project_ref
+TRIGGER_SECRET_KEY=tr_dev_your_secret_key
+```
+
+Run the local Trigger.dev worker:
+
+```bash
+npm run trigger:dev
+```
+
+The initial task lives at `trigger/health-check.ts` and can be triggered from the Trigger.dev dashboard while AI generation workflows are being built.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

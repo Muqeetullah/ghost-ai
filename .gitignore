@@ -20,6 +20,9 @@ pnpm-debug.log*
 # testing
 coverage/
 
+# local trigger.dev state
+.trigger/
+
 # typescript
 tsconfig.tsbuildinfo
 
