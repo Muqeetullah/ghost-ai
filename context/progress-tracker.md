@@ -12,6 +12,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed
 
+- Spec generation success chat guard: verified the AI sidebar could send a success chat message even when generated spec refresh failed, and moved the success message into the confirmed `nextSpec` branch so failed refreshes only surface the existing action error.
+- README documentation refresh: replaced the starter README with a production-grade project overview covering Ghost AI branding, architecture, features, setup, environment variables, API routes, deployment, performance optimizations, technical challenges, future work, and contributor guidance.
 - Specs card horizontal overflow fix: clipped horizontal overflow at the Specs scroll area and tightened each preview card with `max-w-full` plus `w-0` on the flexing text region so generated filenames can no longer push cards beyond the sidebar width.
 - Specs panel overflow fix: made each Specs tab row explicitly shrinkable with `min-w-0`, `w-full`, and `overflow-hidden` so long generated filenames truncate inside the card instead of forcing the box wider than the sidebar.
 - Specs list row UI fix: replaced the invalid nested button markup in the Specs tab with separate preview and download controls, restored stable row layout, and kept long filenames truncated cleanly without pushing the action button out of place.
@@ -88,6 +90,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Session Notes
 
+- 2026-05-21: Fixed the still-valid AI sidebar spec completion issue. The successful Trigger run path now posts "Technical spec generated and saved" only after `waitForGeneratedSpec` returns a spec and `setSelectedSpec` is called; refresh failures keep the existing `specActionError` behavior without adding a misleading success chat message.
+- 2026-05-21: Refreshed `README.md` into a polished GitHub-facing project document. It now presents Ghost AI as an AI-assisted collaborative system design workspace, documents the real stack and repo boundaries, lists API routes and env vars, explains Trigger.dev/Liveblocks/Prisma/Vercel Blob integration, and includes placeholders for screenshots and a demo.
 - 2026-05-21: Enabled the existing Specs tab `Generate Spec` button. `CanvasRoom` now publishes the live node/edge snapshot to `WorkspaceShell`, `AiSidebar` sends the current graph plus room chat history to `/api/ai/spec`, tracks the returned Trigger run through `/api/ai/spec/token`, posts collaborative success/failure chat updates, and refreshes the spec list after a successful save. Verified with targeted lint and production build; `npx tsc --noEmit` hit a Next-generated `.next/types/validator.ts` import issue for `./routes.js` even though `next build` typechecking passed.
 - 2026-05-21: Completed `context/feature-specs/29-spec-ui-integration.md`. Replaced the placeholder Specs tab with a compact project spec list, added a Markdown preview modal with download action, added read-only `GET /api/projects/[projectId]/specs` and `GET /api/projects/[projectId]/specs/[specId]` endpoints for metadata/content access, installed `react-markdown` with `remark-gfm`, and verified the flow with `npm run lint`, `npx tsc --noEmit`, and `npm run build`.
 - 2026-05-21: Started `context/feature-specs/29-spec-ui-integration.md` after the feature spec was populated. Scope is the existing AI sidebar Specs tab only: load persisted project spec metadata, preview selected Markdown through app endpoints, and expose download actions without redesigning the sidebar.

@@ -373,6 +373,14 @@ export function AiSidebar({
 
           if (nextSpec) {
             setSelectedSpec(nextSpec)
+            await pushAiChatMessage({
+              content:
+                "Technical spec generated and saved. The latest result is ready to preview in the Specs tab.",
+              role: "assistant",
+              sender: "Ghost AI",
+              timestamp: new Date().toISOString(),
+              type: "ai-chat",
+            })
           } else {
             setSpecActionError(
               "Ghost AI saved the spec, but the latest result could not be loaded."
@@ -385,15 +393,6 @@ export function AiSidebar({
               : "Could not refresh the generated spec."
           )
         }
-
-        await pushAiChatMessage({
-          content:
-            "Technical spec generated and saved. The latest result is ready to preview in the Specs tab.",
-          role: "assistant",
-          sender: "Ghost AI",
-          timestamp: new Date().toISOString(),
-          type: "ai-chat",
-        })
       })()
 
       return
