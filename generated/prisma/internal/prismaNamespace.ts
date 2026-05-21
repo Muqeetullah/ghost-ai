@@ -386,7 +386,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   Project: 'Project',
   ProjectCollaborator: 'ProjectCollaborator',
-  TaskRun: 'TaskRun'
+  TaskRun: 'TaskRun',
+  ProjectSpec: 'ProjectSpec'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -402,7 +403,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "projectCollaborator" | "taskRun"
+    modelProps: "project" | "projectCollaborator" | "taskRun" | "projectSpec"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -628,6 +629,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ProjectSpec: {
+      payload: Prisma.$ProjectSpecPayload<ExtArgs>
+      fields: Prisma.ProjectSpecFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ProjectSpecFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ProjectSpecFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>
+        }
+        findFirst: {
+          args: Prisma.ProjectSpecFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ProjectSpecFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>
+        }
+        findMany: {
+          args: Prisma.ProjectSpecFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>[]
+        }
+        create: {
+          args: Prisma.ProjectSpecCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>
+        }
+        createMany: {
+          args: Prisma.ProjectSpecCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ProjectSpecCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>[]
+        }
+        delete: {
+          args: Prisma.ProjectSpecDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>
+        }
+        update: {
+          args: Prisma.ProjectSpecUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>
+        }
+        deleteMany: {
+          args: Prisma.ProjectSpecDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ProjectSpecUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ProjectSpecUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>[]
+        }
+        upsert: {
+          args: Prisma.ProjectSpecUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProjectSpecPayload>
+        }
+        aggregate: {
+          args: Prisma.ProjectSpecAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateProjectSpec>
+        }
+        groupBy: {
+          args: Prisma.ProjectSpecGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProjectSpecGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ProjectSpecCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProjectSpecCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -700,6 +775,16 @@ export const TaskRunScalarFieldEnum = {
 } as const
 
 export type TaskRunScalarFieldEnum = (typeof TaskRunScalarFieldEnum)[keyof typeof TaskRunScalarFieldEnum]
+
+
+export const ProjectSpecScalarFieldEnum = {
+  id: 'id',
+  projectId: 'projectId',
+  filePath: 'filePath',
+  createdAt: 'createdAt'
+} as const
+
+export type ProjectSpecScalarFieldEnum = (typeof ProjectSpecScalarFieldEnum)[keyof typeof ProjectSpecScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -900,6 +985,7 @@ export type GlobalOmitConfig = {
   project?: Prisma.ProjectOmit
   projectCollaborator?: Prisma.ProjectCollaboratorOmit
   taskRun?: Prisma.TaskRunOmit
+  projectSpec?: Prisma.ProjectSpecOmit
 }
 
 /* Types for Logging */

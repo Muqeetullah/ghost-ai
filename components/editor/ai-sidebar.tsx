@@ -18,11 +18,24 @@ import {
 } from "@liveblocks/react"
 import { useRealtimeRun } from "@trigger.dev/react-hooks"
 import { Bot, Download, FileText, LoaderCircle, Send, X } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import type { CanvasSnapshot } from "@/types/canvas"
+import type { generateSpec } from "@/trigger/generate-spec"
 import type { designAgent } from "@/trigger/design-agent"
 import {
   AI_CHAT_FEED_ID,
@@ -39,6 +52,7 @@ const STARTER_PROMPTS = [
 ]
 
 interface AiSidebarProps {
+  canvasSnapshot: CanvasSnapshot
   isOpen: boolean
   onClose: () => void
   roomId: string
@@ -49,20 +63,57 @@ interface ActiveRunState {
   runId: string
 }
 
+interface ProjectSpecSummary {
+  createdAt: string
+  filename: string
+  id: string
+}
+
+interface ProjectSpecsResponse {
+  specs: ProjectSpecSummary[]
+}
+
+interface ProjectSpecPreviewResponse extends ProjectSpecSummary {
+  content: string
+}
+
 export function AiSidebar({
+  canvasSnapshot,
   isOpen,
   onClose,
   roomId,
 }: AiSidebarProps) {
+  const [activeTab, setActiveTab] = useState("architect")
   const [prompt, setPrompt] = useState("")
   const [sendError, setSendError] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [activeRun, setActiveRun] = useState<ActiveRunState | null>(null)
+  const [specs, setSpecs] = useState<ProjectSpecSummary[]>([])
+  const [isSpecsLoading, setIsSpecsLoading] = useState(false)
+  const [specsError, setSpecsError] = useState<string | null>(null)
+  const [selectedSpec, setSelectedSpec] = useState<ProjectSpecSummary | null>(
+    null
+  )
+  const [selectedSpecContent, setSelectedSpecContent] = useState<string | null>(
+    null
+  )
+  const [isSelectedSpecLoading, setIsSelectedSpecLoading] = useState(false)
+  const [selectedSpecError, setSelectedSpecError] = useState<string | null>(
+    null
+  )
+  const [activeSpecRun, setActiveSpecRun] = useState<ActiveRunState | null>(
+    null
+  )
+  const [isSpecStarting, setIsSpecStarting] = useState(false)
+  const [specActionError, setSpecActionError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const chatEndRef = useRef<HTMLDivElement | null>(null)
   const isComposingRef = useRef(false)
   const completedRunIdsRef = useRef<Set<string>>(new Set())
   const errorRunIdsRef = useRef<Set<string>>(new Set())
+  const completedSpecRunIdsRef = useRef<Set<string>>(new Set())
+  const errorSpecRunIdsRef = useRef<Set<string>>(new Set())
+  const hasLoadedSpecsRef = useRef(false)
   const createFeed = useCreateFeed()
   const createFeedMessage = useCreateFeedMessage()
   const chatFeed = useFeedMessages(AI_CHAT_FEED_ID)
@@ -85,10 +136,20 @@ export function AiSidebar({
       accessToken: activeRun?.publicToken,
       enabled: Boolean(activeRun?.runId && activeRun?.publicToken),
     })
+  const { run: realtimeSpecRun, error: realtimeSpecRunError } =
+    useRealtimeRun<typeof generateSpec>(activeSpecRun?.runId, {
+      accessToken: activeSpecRun?.publicToken,
+      enabled: Boolean(activeSpecRun?.runId && activeSpecRun?.publicToken),
+    })
   const isTrackedRunActive =
     activeRun !== null &&
     !realtimeRun?.finishedAt &&
     !isTerminalRunStatus(realtimeRun?.status)
+  const isTrackedSpecRunActive =
+    activeSpecRun !== null &&
+    !realtimeSpecRun?.finishedAt &&
+    !isTerminalRunStatus(realtimeSpecRun?.status)
+  const isSpecGenerationActive = isSpecStarting || isTrackedSpecRunActive
   const isGenerationActive =
     isSending ||
     isTrackedRunActive ||
@@ -116,6 +177,99 @@ export function AiSidebar({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ block: "end" })
   }, [chatMessages.length])
+
+  const loadSpecs = useCallback(
+    async (force = false) => {
+      if (!force && hasLoadedSpecsRef.current) {
+        return specs
+      }
+
+      setIsSpecsLoading(true)
+      setSpecsError(null)
+
+      try {
+        const response = await fetch(`/api/projects/${roomId}/specs`)
+        const payload = await readJsonResponse<ProjectSpecsResponse>(response)
+
+        hasLoadedSpecsRef.current = true
+        setSpecs(payload.specs)
+        return payload.specs
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Could not load specs for this project."
+
+        setSpecsError(message)
+        throw error instanceof Error ? error : new Error(message)
+      } finally {
+        setIsSpecsLoading(false)
+      }
+    },
+    [roomId, specs]
+  )
+
+  useEffect(() => {
+    hasLoadedSpecsRef.current = false
+  }, [roomId])
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== "specs" || hasLoadedSpecsRef.current) {
+      return
+    }
+
+    void loadSpecs().catch(() => undefined)
+  }, [activeTab, isOpen, loadSpecs])
+
+  useEffect(() => {
+    if (!selectedSpec) {
+      return
+    }
+
+    const specId = selectedSpec.id
+    let isMounted = true
+
+    async function loadSelectedSpec() {
+      setIsSelectedSpecLoading(true)
+      setSelectedSpecContent(null)
+      setSelectedSpecError(null)
+
+      try {
+        const response = await fetch(
+          `/api/projects/${roomId}/specs/${specId}`
+        )
+        const payload = await readJsonResponse<ProjectSpecPreviewResponse>(
+          response
+        )
+
+        if (!isMounted) {
+          return
+        }
+
+        setSelectedSpecContent(payload.content)
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        setSelectedSpecError(
+          error instanceof Error
+            ? error.message
+            : "Could not load the selected spec."
+        )
+      } finally {
+        if (isMounted) {
+          setIsSelectedSpecLoading(false)
+        }
+      }
+    }
+
+    void loadSelectedSpec()
+
+    return () => {
+      isMounted = false
+    }
+  }, [roomId, selectedSpec])
 
   const pushAiChatMessage = useCallback(
     async (message: AiChatFeedPayload) => {
@@ -154,6 +308,20 @@ export function AiSidebar({
   }, [activeRun, pushAiChatMessage, realtimeRunError])
 
   useEffect(() => {
+    if (!activeSpecRun || !realtimeSpecRunError) {
+      return
+    }
+
+    if (errorSpecRunIdsRef.current.has(activeSpecRun.runId)) {
+      return
+    }
+
+    errorSpecRunIdsRef.current.add(activeSpecRun.runId)
+    setActiveSpecRun(null)
+    setSpecActionError(realtimeSpecRunError.message)
+  }, [activeSpecRun, realtimeSpecRunError])
+
+  useEffect(() => {
     if (!activeRun || !realtimeRun?.finishedAt) {
       return
     }
@@ -177,6 +345,77 @@ export function AiSidebar({
       type: "ai-chat",
     })
   }, [activeRun, pushAiChatMessage, realtimeRun])
+
+  useEffect(() => {
+    if (!activeSpecRun || !realtimeSpecRun?.finishedAt) {
+      return
+    }
+
+    if (completedSpecRunIdsRef.current.has(activeSpecRun.runId)) {
+      return
+    }
+
+    completedSpecRunIdsRef.current.add(activeSpecRun.runId)
+    setActiveSpecRun(null)
+
+    if (realtimeSpecRun.isSuccess) {
+      const generatedSpecId = readSpecRunMetadataValue(
+        realtimeSpecRun.metadata,
+        "specId"
+      )
+
+      void (async () => {
+        try {
+          const nextSpec = await waitForGeneratedSpec({
+            loadSpecs,
+            preferredSpecId: generatedSpecId,
+          })
+
+          if (nextSpec) {
+            setSelectedSpec(nextSpec)
+            await pushAiChatMessage({
+              content:
+                "Technical spec generated and saved. The latest result is ready to preview in the Specs tab.",
+              role: "assistant",
+              sender: "Ghost AI",
+              timestamp: new Date().toISOString(),
+              type: "ai-chat",
+            })
+          } else {
+            setSpecActionError(
+              "Ghost AI saved the spec, but the latest result could not be loaded."
+            )
+          }
+        } catch (error) {
+          setSpecActionError(
+            error instanceof Error
+              ? error.message
+              : "Could not refresh the generated spec."
+          )
+        }
+      })()
+
+      return
+    }
+
+    const errorMessage =
+      realtimeSpecRun.error?.message ??
+      "Ghost AI could not generate the technical spec."
+    const errorTimeout = window.setTimeout(() => {
+      setSpecActionError(errorMessage)
+      void pushAiChatMessage({
+        content: `Ghost AI could not generate the spec: ${errorMessage}`,
+        role: "assistant",
+        sender: "Ghost AI",
+        timestamp: new Date().toISOString(),
+        type: "ai-chat",
+      })
+    }, 0)
+
+    return () => {
+      window.clearTimeout(errorTimeout)
+    }
+  }, [activeSpecRun, loadSpecs, pushAiChatMessage, realtimeSpecRun])
 
   function updatePrompt(value: string) {
     setPrompt(value)
@@ -245,6 +484,48 @@ export function AiSidebar({
       })
     } finally {
       setIsSending(false)
+    }
+  }
+
+  async function generateSpecDocument() {
+    if (
+      isSpecGenerationActive ||
+      canvasSnapshot.nodes.length === 0 ||
+      canvasSnapshot.edges.length === 0
+    ) {
+      return
+    }
+
+    setIsSpecStarting(true)
+    setSpecActionError(null)
+
+    try {
+      const specRun = await startSpecRun({
+        chatHistory: chatMessages,
+        edges: canvasSnapshot.edges,
+        nodes: canvasSnapshot.nodes,
+        roomId,
+      })
+
+      setActiveSpecRun(specRun)
+      setActiveTab("specs")
+      hasLoadedSpecsRef.current = false
+      void pushAiChatMessage({
+        content:
+          "Generating a technical spec from the current canvas and room context.",
+        role: "assistant",
+        sender: "Ghost AI",
+        timestamp: new Date().toISOString(),
+        type: "ai-chat",
+      })
+    } catch (error) {
+      const messageText =
+        error instanceof Error
+          ? error.message
+          : "Unable to start spec generation."
+      setSpecActionError(messageText)
+    } finally {
+      setIsSpecStarting(false)
     }
   }
 
@@ -324,7 +605,11 @@ export function AiSidebar({
           </span>
         </div>
 
-        <Tabs defaultValue="architect" className="mt-4 min-h-0 flex-1">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="mt-4 min-h-0 flex-1"
+        >
           <TabsList className="grid h-9 w-full grid-cols-2 rounded-xl border border-surface-border bg-bg-subtle p-1">
             <TabsTrigger
               value="architect"
@@ -471,49 +756,284 @@ export function AiSidebar({
             </div>
           </TabsContent>
 
-          <TabsContent value="specs" className="mt-4 min-h-0 space-y-4">
+          <TabsContent
+            value="specs"
+            className="mt-4 flex min-h-0 flex-1 flex-col gap-4"
+          >
             <Button
               type="button"
-              disabled
-              aria-disabled="true"
-              aria-label="Generate Spec (coming soon)"
-              title="Coming soon"
+              disabled={
+                isSpecGenerationActive ||
+                canvasSnapshot.nodes.length === 0 ||
+                canvasSnapshot.edges.length === 0
+              }
+              aria-label="Generate technical spec"
+              onClick={() => void generateSpecDocument()}
               className="w-full bg-ai text-copy-primary hover:bg-ai/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <FileText className="h-4 w-4" />
-              Generate Spec
+              {isSpecGenerationActive ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              {isSpecGenerationActive ? "Generating Spec..." : "Generate Spec"}
             </Button>
 
-            <div className="rounded-2xl border border-surface-border bg-bg-elevated p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-sm font-semibold text-copy-primary">
-                    Architecture Spec Draft
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-copy-muted">
-                    Demo technical specification generated from the current
-                    canvas graph, including components, data flow, and
-                    deployment notes.
-                  </p>
-                </div>
+            {specActionError ? (
+              <div className="rounded-2xl border border-state-error/40 bg-state-error/10 px-3 py-3 text-sm text-state-error">
+                {specActionError}
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled
-                className="mt-4 w-full justify-center text-copy-muted"
-              >
-                <Download className="h-4 w-4" />
-                Download unavailable
-              </Button>
+            ) : null}
+
+            {!isSpecGenerationActive &&
+            (canvasSnapshot.nodes.length === 0 || canvasSnapshot.edges.length === 0) ? (
+              <div className="rounded-2xl border border-surface-border bg-bg-base px-3 py-3 text-sm text-copy-muted">
+                Add at least one connected flow to the canvas before generating a spec.
+              </div>
+            ) : null}
+
+            <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-surface-border bg-bg-elevated">
+              <div className="border-b border-surface-border px-4 py-3">
+                <h3 className="text-sm font-semibold text-copy-primary">
+                  Project Specs
+                </h3>
+                <p className="mt-1 text-xs text-copy-muted">
+                  Preview and download generated Markdown specs.
+                </p>
+              </div>
+
+              <ScrollArea className="min-h-0 flex-1 overflow-x-hidden">
+                <div className="max-w-full space-y-2 overflow-x-hidden p-3">
+                  {isSpecsLoading ? (
+                    <div className="flex min-h-40 flex-col items-center justify-center gap-3 text-center">
+                      <LoaderCircle className="h-5 w-5 animate-spin text-copy-muted" />
+                      <p className="text-sm text-copy-muted">
+                        Loading project specs...
+                      </p>
+                    </div>
+                  ) : specsError ? (
+                    <div className="rounded-2xl border border-state-error/40 bg-state-error/10 px-3 py-4 text-sm text-state-error">
+                      {specsError}
+                    </div>
+                  ) : specs.length === 0 ? (
+                    <div className="flex min-h-40 flex-col items-center justify-center px-4 py-8 text-center">
+                      <div className="flex size-11 items-center justify-center rounded-2xl bg-bg-subtle text-copy-muted">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <p className="mt-4 text-sm font-medium text-copy-primary">
+                        No specs yet
+                      </p>
+                      <p className="mt-2 max-w-60 text-sm leading-6 text-copy-muted">
+                        Generated architecture specs will appear here for quick
+                        preview and download.
+                      </p>
+                    </div>
+                  ) : (
+                    specs.map((spec) => (
+                      <div
+                        key={spec.id}
+                        className="flex min-w-0 w-full max-w-full items-start gap-2 overflow-hidden rounded-xl border border-surface-border bg-bg-base p-2 transition-colors hover:border-subtle-border hover:bg-bg-subtle"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSpec(spec)}
+                          className="block w-0 min-w-0 max-w-full flex-1 overflow-hidden rounded-lg px-3 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60"
+                        >
+                          <p
+                            className="block truncate text-sm font-medium text-copy-primary"
+                            title={spec.filename}
+                          >
+                            {spec.filename}
+                          </p>
+                          <p className="mt-1 text-xs text-copy-muted">
+                            {formatSpecTimestamp(spec.createdAt)}
+                          </p>
+                        </button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Download ${spec.filename}`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            downloadProjectSpec(roomId, spec.id)
+                          }}
+                          className="mt-1 shrink-0 text-copy-muted hover:bg-bg-subtle hover:text-copy-primary"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
             </div>
           </TabsContent>
         </Tabs>
       </aside>
+
+      <Dialog
+        open={selectedSpec !== null}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            return
+          }
+
+          setSelectedSpec(null)
+          setSelectedSpecContent(null)
+          setSelectedSpecError(null)
+        }}
+      >
+        <DialogContent className="h-[min(85vh,52rem)] w-[min(92vw,64rem)] max-w-[min(92vw,64rem)] gap-0 overflow-hidden rounded-3xl border border-surface-border bg-bg-elevated p-0 text-copy-primary shadow-2xl ring-0 sm:max-w-[min(92vw,64rem)]">
+          <DialogHeader className="border-b border-surface-border px-6 py-5 pr-14">
+            <DialogTitle className="break-all pr-2 text-lg leading-tight font-semibold text-copy-primary">
+              {selectedSpec?.filename ?? "Spec preview"}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-copy-muted">
+              {selectedSpec
+                ? `Generated ${formatSpecTimestamp(selectedSpec.createdAt)}`
+                : "Preview the generated Markdown spec."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="px-6 py-5">
+              {isSelectedSpecLoading ? (
+                <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
+                  <LoaderCircle className="h-5 w-5 animate-spin text-copy-muted" />
+                  <p className="text-sm text-copy-muted">
+                    Loading spec preview...
+                  </p>
+                </div>
+              ) : selectedSpecError ? (
+                <div className="rounded-2xl border border-state-error/40 bg-state-error/10 px-4 py-4 text-sm text-state-error">
+                  {selectedSpecError}
+                </div>
+              ) : selectedSpecContent ? (
+                <div className="mx-auto w-full max-w-3xl space-y-4">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({ ...props }) => (
+                        <a
+                          {...props}
+                          className="text-brand underline underline-offset-4"
+                          target="_blank"
+                          rel="noreferrer"
+                        />
+                      ),
+                      blockquote: ({ ...props }) => (
+                        <blockquote
+                          {...props}
+                          className="border-l-2 border-surface-border pl-4 text-copy-secondary"
+                        />
+                      ),
+                      code: ({ className, ...props }) => {
+                        const isBlock = Boolean(className)
+
+                        if (isBlock) {
+                          return (
+                            <code
+                              {...props}
+                              className={cn(
+                                "block overflow-x-auto rounded-xl bg-bg-base px-4 py-3 font-mono text-xs text-copy-secondary",
+                                className
+                              )}
+                            />
+                          )
+                        }
+
+                        return (
+                          <code
+                            {...props}
+                            className="rounded-md bg-bg-base px-1.5 py-0.5 font-mono text-xs text-copy-primary"
+                          />
+                        )
+                      },
+                      h1: ({ ...props }) => (
+                        <h1
+                          {...props}
+                          className="text-2xl font-semibold text-copy-primary"
+                        />
+                      ),
+                      h2: ({ ...props }) => (
+                        <h2
+                          {...props}
+                          className="text-xl font-semibold text-copy-primary"
+                        />
+                      ),
+                      h3: ({ ...props }) => (
+                        <h3
+                          {...props}
+                          className="text-lg font-semibold text-copy-primary"
+                        />
+                      ),
+                      li: ({ ...props }) => (
+                        <li
+                          {...props}
+                          className="ml-5 list-disc text-sm leading-7 text-copy-secondary"
+                        />
+                      ),
+                      ol: ({ ...props }) => (
+                        <ol {...props} className="space-y-1" />
+                      ),
+                      p: ({ ...props }) => (
+                        <p
+                          {...props}
+                          className="text-sm leading-7 text-copy-secondary"
+                        />
+                      ),
+                      pre: ({ ...props }) => (
+                        <pre {...props} className="my-4 overflow-x-auto" />
+                      ),
+                      table: ({ ...props }) => (
+                        <div className="overflow-x-auto">
+                          <table
+                            {...props}
+                            className="min-w-full border-collapse text-sm"
+                          />
+                        </div>
+                      ),
+                      td: ({ ...props }) => (
+                        <td
+                          {...props}
+                          className="border border-surface-border px-3 py-2 text-copy-secondary"
+                        />
+                      ),
+                      th: ({ ...props }) => (
+                        <th
+                          {...props}
+                          className="border border-surface-border bg-bg-base px-3 py-2 text-left font-medium text-copy-primary"
+                        />
+                      ),
+                      ul: ({ ...props }) => (
+                        <ul {...props} className="space-y-1" />
+                      ),
+                    }}
+                  >
+                    {selectedSpecContent}
+                  </ReactMarkdown>
+                </div>
+              ) : null}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="border-surface-border bg-bg-base/80" showCloseButton>
+            <Button
+              type="button"
+              onClick={() => {
+                if (selectedSpec) {
+                  downloadProjectSpec(roomId, selectedSpec.id)
+                }
+              }}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -558,6 +1078,48 @@ async function startDesignRun({
   }
 }
 
+async function startSpecRun({
+  chatHistory,
+  edges,
+  nodes,
+  roomId,
+}: {
+  chatHistory: ProjectSpecPreviewResponse["content"] extends string
+    ? AiChatFeedPayload[]
+    : never
+  edges: CanvasSnapshot["edges"]
+  nodes: CanvasSnapshot["nodes"]
+  roomId: string
+}): Promise<ActiveRunState> {
+  const response = await fetch("/api/ai/spec", {
+    body: JSON.stringify({
+      chatHistory,
+      edges,
+      nodes,
+      roomId,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  })
+
+  const data: unknown = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(readApiError(data) ?? "Unable to start spec generation.")
+  }
+
+  if (!isRecord(data) || typeof data.runId !== "string") {
+    throw new Error("Ghost AI did not return a spec run ID.")
+  }
+
+  return {
+    publicToken: await fetchSpecRunToken(data.runId.trim()),
+    runId: data.runId.trim(),
+  }
+}
+
 async function fetchDesignRunToken(runId: string) {
   const response = await fetch("/api/ai/design/token", {
     body: JSON.stringify({ runId }),
@@ -577,6 +1139,41 @@ async function fetchDesignRunToken(runId: string) {
   }
 
   return data.token.trim()
+}
+
+async function fetchSpecRunToken(runId: string) {
+  const response = await fetch("/api/ai/spec/token", {
+    body: JSON.stringify({ runId }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  })
+  const data: unknown = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(readApiError(data) ?? "Unable to create a spec run token.")
+  }
+
+  if (!isRecord(data) || typeof data.token !== "string" || !data.token.trim()) {
+    throw new Error("Ghost AI did not return a spec run token.")
+  }
+
+  return data.token.trim()
+}
+
+function downloadProjectSpec(projectId: string, specId: string) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  const anchor = document.createElement("a")
+  anchor.href = `/api/projects/${projectId}/specs/${specId}/download`
+  anchor.rel = "noreferrer"
+  anchor.style.display = "none"
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
 }
 
 function getCompletedRunMessage(output: unknown) {
@@ -623,8 +1220,63 @@ function readApiError(value: unknown) {
   return null
 }
 
+async function waitForGeneratedSpec({
+  loadSpecs,
+  preferredSpecId,
+}: {
+  loadSpecs: (force?: boolean) => Promise<ProjectSpecSummary[]>
+  preferredSpecId?: string
+}) {
+  const maxAttempts = preferredSpecId ? 4 : 1
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const nextSpecs = await loadSpecs(true)
+    const matchedSpec = preferredSpecId
+      ? nextSpecs.find((spec) => spec.id === preferredSpecId)
+      : nextSpecs[0]
+
+    if (matchedSpec) {
+      return matchedSpec
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await waitForSpecRefresh(300 * (attempt + 1))
+    }
+  }
+
+  return null
+}
+
+function readSpecRunMetadataValue(
+  metadataValue: unknown,
+  key: string
+) {
+  if (!isRecord(metadataValue)) {
+    return undefined
+  }
+
+  const value = metadataValue[key]
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const data: unknown = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(readApiError(data) ?? "Request failed.")
+  }
+
+  return data as T
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function waitForSpecRefresh(delayInMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, delayInMs)
+  })
 }
 
 function formatChatTimestamp(timestamp: string) {
@@ -637,5 +1289,18 @@ function formatChatTimestamp(timestamp: string) {
   return date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
+  })
+}
+
+function formatSpecTimestamp(timestamp: string) {
+  const date = new Date(timestamp)
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date"
+  }
+
+  return date.toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
   })
 }

@@ -2,6 +2,16 @@ import { z } from "zod";
 
 import { NODE_SHAPES } from "@/types/canvas";
 
+export const MAX_SPEC_CHAT_HISTORY_MESSAGES = 12;
+export const MAX_SPEC_CHAT_MESSAGE_CHARS = 600;
+
+const SPEC_CHAT_MESSAGES_TO_IGNORE = [
+  /^generating a technical spec from the current canvas and room context\.?$/i,
+  /^technical spec generated and saved\./i,
+  /^ghost ai could not generate the spec:/i,
+  /^canvas updated:/i,
+];
+
 export const specChatMessageSchema = z
   .object({
     content: z.string().trim().min(1),
@@ -63,3 +73,40 @@ export type SpecGenerationRequest = z.infer<typeof specGenerationRequestSchema>;
 export type SpecGenerationTaskPayload = z.infer<
   typeof specGenerationTaskPayloadSchema
 >;
+
+export function normalizeSpecChatHistory(
+  chatHistory: SpecChatMessage[]
+): SpecChatMessage[] {
+  return chatHistory
+    .map((message) => {
+      const content = clampSpecChatMessageContent(message.content);
+
+      return {
+        ...message,
+        content,
+      };
+    })
+    .filter((message) => isRelevantSpecChatMessage(message))
+    .slice(-MAX_SPEC_CHAT_HISTORY_MESSAGES)
+    .filter((message) => message.content.length > 0);
+}
+
+function clampSpecChatMessageContent(content: string) {
+  const normalized = content.replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= MAX_SPEC_CHAT_MESSAGE_CHARS) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, MAX_SPEC_CHAT_MESSAGE_CHARS - 3).trimEnd()}...`;
+}
+
+function isRelevantSpecChatMessage(message: SpecChatMessage) {
+  if (message.role === "user") {
+    return true;
+  }
+
+  return !SPEC_CHAT_MESSAGES_TO_IGNORE.some((pattern) =>
+    pattern.test(message.content)
+  );
+}

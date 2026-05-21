@@ -53,7 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   Project: 'Project',
   ProjectCollaborator: 'ProjectCollaborator',
-  TaskRun: 'TaskRun'
+  TaskRun: 'TaskRun',
+  ProjectSpec: 'ProjectSpec'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -105,6 +106,16 @@ export const TaskRunScalarFieldEnum = {
 } as const
 
 export type TaskRunScalarFieldEnum = (typeof TaskRunScalarFieldEnum)[keyof typeof TaskRunScalarFieldEnum]
+
+
+export const ProjectSpecScalarFieldEnum = {
+  id: 'id',
+  projectId: 'projectId',
+  filePath: 'filePath',
+  createdAt: 'createdAt'
+} as const
+
+export type ProjectSpecScalarFieldEnum = (typeof ProjectSpecScalarFieldEnum)[keyof typeof ProjectSpecScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -3,7 +3,10 @@ import { tasks } from "@trigger.dev/sdk";
 import { jsonError } from "@/app/api/projects/_lib/project-api";
 import { prisma } from "@/lib/prisma";
 import { getAccessibleProject, getCurrentClerkIdentity } from "@/lib/project-access";
-import { specGenerationRequestSchema } from "@/lib/spec-generation";
+import {
+  normalizeSpecChatHistory,
+  specGenerationRequestSchema,
+} from "@/lib/spec-generation";
 import type { generateSpec } from "@/trigger/generate-spec";
 
 export async function POST(request: Request) {
@@ -28,8 +31,10 @@ export async function POST(request: Request) {
     return jsonError("Forbidden", 403);
   }
 
+  const normalizedChatHistory = normalizeSpecChatHistory(body.chatHistory);
+
   const handle = await tasks.trigger<typeof generateSpec>("generate-spec", {
-    chatHistory: body.chatHistory,
+    chatHistory: normalizedChatHistory,
     edges: body.edges,
     nodes: body.nodes,
     projectId: project.id,
