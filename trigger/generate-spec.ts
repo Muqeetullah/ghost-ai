@@ -3,9 +3,10 @@ import { generateText } from "ai"
 import { logger, metadata, task } from "@trigger.dev/sdk"
 
 import { prisma } from "@/lib/prisma"
+import { persistProjectSpec } from "@/lib/project-specs"
 import {
+  normalizeSpecChatHistory,
   specGenerationTaskPayloadSchema,
-  type SpecCanvasEdgeInput,
   type SpecCanvasNodeInput,
   type SpecChatMessage,
   type SpecGenerationTaskPayload,
@@ -24,40 +25,59 @@ export const generateSpec = task({
 
     try {
       const input = specGenerationTaskPayloadSchema.parse(payload)
+      const normalizedInput = {
+        ...input,
+        chatHistory: normalizeSpecChatHistory(input.chatHistory),
+      }
 
       metadata
-        .set("projectId", input.projectId)
-        .set("roomId", input.roomId)
+        .set("projectId", normalizedInput.projectId)
+        .set("roomId", normalizedInput.roomId)
         .set("status", "loading_context")
         .set("chatMessages", input.chatHistory.length)
-        .set("edgeCount", input.edges.length)
-        .set("nodeCount", input.nodes.length)
+        .set("chatMessagesUsed", normalizedInput.chatHistory.length)
+        .set("edgeCount", normalizedInput.edges.length)
+        .set("nodeCount", normalizedInput.nodes.length)
 
       logger.info("Spec generation task started", {
         chatMessages: input.chatHistory.length,
-        edgeCount: input.edges.length,
-        nodeCount: input.nodes.length,
-        projectId: input.projectId,
-        roomId: input.roomId,
+        chatMessagesUsed: normalizedInput.chatHistory.length,
+        edgeCount: normalizedInput.edges.length,
+        nodeCount: normalizedInput.nodes.length,
+        projectId: normalizedInput.projectId,
+        roomId: normalizedInput.roomId,
       })
 
-      const project = await readSpecProjectContext(input.projectId)
-      assertSpecRoomMatchesProject(input.roomId, project.id)
+      const project = await readSpecProjectContext(normalizedInput.projectId)
+      assertSpecRoomMatchesProject(normalizedInput.roomId, project.id)
+      const prompt = buildSpecUserPrompt(normalizedInput, project)
+
+      metadata.set("promptChars", prompt.length)
 
       metadata.set("status", "generating")
 
-      const markdown = await generateMarkdownSpec(input, project)
+      const markdown = await generateMarkdownSpec(normalizedInput, project)
       const heading = readFirstMarkdownHeading(markdown)
+      metadata.set("status", "persisting")
+
+      const projectSpec = await persistProjectSpec({
+        projectId: project.id,
+        projectName: project.name,
+        markdown,
+      })
 
       metadata
         .set("status", "completed")
         .set("markdownLength", markdown.length)
+        .set("specFilePath", projectSpec.filePath)
+        .set("specId", projectSpec.id)
         .set("title", heading ?? `${project.name} Technical Specification`)
 
       logger.info("Spec generation task completed", {
         markdownLength: markdown.length,
-        projectId: input.projectId,
-        roomId: input.roomId,
+        projectId: normalizedInput.projectId,
+        roomId: normalizedInput.roomId,
+        specId: projectSpec.id,
         title: heading,
       })
 
@@ -108,7 +128,19 @@ async function generateMarkdownSpec(
 ) {
   const google = getGoogleProvider()
   const result = await generateText({
-    model: google("gemini-2.5-flash"),
+    model: google("gemini-2.5-flash-lite"),
+    maxOutputTokens: 1800,
+    maxRetries: 0,
+    timeout: {
+      totalMs: 30_000,
+    },
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      },
+    },
     temperature: 0.2,
     system: buildSpecSystemPrompt(),
     prompt: buildSpecUserPrompt(payload, project),
@@ -144,50 +176,65 @@ function buildSpecUserPrompt(
   payload: SpecGenerationTaskPayload,
   project: SpecProjectContext
 ) {
-  return JSON.stringify(
-    {
-      chatHistory: payload.chatHistory.map(serializeChatMessage),
-      graph: {
-        edges: payload.edges.map(serializeEdge),
-        nodes: payload.nodes.map(serializeNode),
-      },
-      project,
-      roomId: payload.roomId,
-    },
-    null,
-    2
-  )
+  const chatHistory = payload.chatHistory
+    .map(serializeChatMessage)
+    .map((message, index) => {
+      return `${index + 1}. [${message.role}] ${message.content}`
+    })
+    .join("\n")
+
+  const nodes = payload.nodes
+    .map((node, index) => {
+      const parts = [
+        `id=${node.id}`,
+        `label=${JSON.stringify(node.data.label)}`,
+        `shape=${node.data.shape}`,
+      ]
+
+      if (projectNodeHasMeaningfulPosition(node)) {
+        parts.push(`position=(${Math.round(node.position.x)}, ${Math.round(node.position.y)})`)
+      }
+
+      return `${index + 1}. ${parts.join(" | ")}`
+    })
+    .join("\n")
+
+  const edges = payload.edges
+    .map((edge, index) => {
+      const label =
+        typeof edge.label === "number" ? String(edge.label) : edge.label?.trim()
+
+      return `${index + 1}. ${edge.source} -> ${edge.target}${label ? ` | ${JSON.stringify(label)}` : ""}`
+    })
+    .join("\n")
+
+  return [
+    `Project: ${project.name}`,
+    project.description ? `Project description: ${project.description}` : null,
+    `Room ID: ${payload.roomId}`,
+    "",
+    "Canvas nodes:",
+    nodes || "None",
+    "",
+    "Canvas edges:",
+    edges || "None",
+    "",
+    "Relevant chat context:",
+    chatHistory || "None",
+  ]
+    .filter((section) => section !== null)
+    .join("\n")
 }
 
 function serializeChatMessage(message: SpecChatMessage) {
   return {
     content: message.content,
     role: message.role,
-    sender: message.sender ?? null,
-    timestamp: message.timestamp ?? null,
   }
 }
 
-function serializeNode(node: SpecCanvasNodeInput) {
-  return {
-    color: node.data.color,
-    height: node.height ?? node.initialHeight ?? null,
-    id: node.id,
-    label: node.data.label,
-    position: node.position,
-    shape: node.data.shape,
-    width: node.width ?? node.initialWidth ?? null,
-  }
-}
-
-function serializeEdge(edge: SpecCanvasEdgeInput) {
-  return {
-    id: edge.id,
-    label:
-      typeof edge.label === "number" ? String(edge.label) : edge.label ?? null,
-    source: edge.source,
-    target: edge.target,
-  }
+function projectNodeHasMeaningfulPosition(node: SpecCanvasNodeInput) {
+  return Number.isFinite(node.position.x) && Number.isFinite(node.position.y)
 }
 
 function getGoogleProvider() {

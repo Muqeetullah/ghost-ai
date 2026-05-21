@@ -13,6 +13,7 @@ model Project {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
   collaborators  ProjectCollaborator[]
+  specs          ProjectSpec[]
   taskRuns       TaskRun[]
 
   @@index([ownerId])
@@ -41,4 +42,14 @@ model TaskRun {
 
   @@index([runId])
   @@index([userId, projectId])
+}
+
+model ProjectSpec {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  filePath  String
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
 }

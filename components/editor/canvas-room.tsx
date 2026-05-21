@@ -117,6 +117,7 @@ const VIEWPORT_ANIMATION_DURATION = 160
 interface CanvasRoomProps {
   onSaveNowChange: (saveNow: (() => void) | null) => void
   onSaveStatusChange: (status: CanvasSaveStatus) => void
+  onSnapshotChange: (snapshot: CanvasSnapshot) => void
   roomId: string
   templateImport: CanvasTemplateImport | null
 }
@@ -132,6 +133,7 @@ interface ShapeDragPreview {
 export function CanvasRoom({
   onSaveNowChange,
   onSaveStatusChange,
+  onSnapshotChange,
   roomId,
   templateImport,
 }: CanvasRoomProps) {
@@ -142,6 +144,7 @@ export function CanvasRoom({
           <CanvasFlow
             onSaveNowChange={onSaveNowChange}
             onSaveStatusChange={onSaveStatusChange}
+            onSnapshotChange={onSnapshotChange}
             projectId={roomId}
             templateImport={templateImport}
           />
@@ -154,6 +157,7 @@ export function CanvasRoom({
 interface CanvasFlowProps {
   onSaveNowChange: (saveNow: (() => void) | null) => void
   onSaveStatusChange: (status: CanvasSaveStatus) => void
+  onSnapshotChange: (snapshot: CanvasSnapshot) => void
   projectId: string
   templateImport: CanvasTemplateImport | null
 }
@@ -161,6 +165,7 @@ interface CanvasFlowProps {
 function CanvasFlow({
   onSaveNowChange,
   onSaveStatusChange,
+  onSnapshotChange,
   projectId,
   templateImport,
 }: CanvasFlowProps) {
@@ -199,6 +204,13 @@ function CanvasFlow({
   useEffect(() => {
     onSaveStatusChange(saveStatus)
   }, [onSaveStatusChange, saveStatus])
+
+  useEffect(() => {
+    onSnapshotChange({
+      edges,
+      nodes,
+    })
+  }, [edges, nodes, onSnapshotChange])
 
   useEffect(() => {
     onSaveNowChange(saveNow)

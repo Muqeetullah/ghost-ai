@@ -28,6 +28,24 @@ function createPrismaClient(databaseUrl: string) {
   }).$extends(withAccelerate());
 }
 
+function hasExpectedModelDelegates(client: unknown): client is {
+  project: unknown
+  projectCollaborator: unknown
+  taskRun: unknown
+  projectSpec: unknown
+} {
+  if (!client || typeof client !== "object") {
+    return false;
+  }
+
+  return (
+    "project" in client &&
+    "projectCollaborator" in client &&
+    "taskRun" in client &&
+    "projectSpec" in client
+  );
+}
+
 function isAccelerateUrl(databaseUrl: string) {
   return databaseUrl.startsWith("prisma://") || databaseUrl.startsWith("prisma+postgres://");
 }
@@ -51,7 +69,12 @@ function normalizeRuntimePgUrl(databaseUrl: string) {
   return parsedUrl.toString();
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient(connectionString);
+const cachedPrisma = globalForPrisma.prisma;
+
+export const prisma =
+  cachedPrisma && hasExpectedModelDelegates(cachedPrisma)
+    ? cachedPrisma
+    : createPrismaClient(connectionString);
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;

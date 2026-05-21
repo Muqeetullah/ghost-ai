@@ -21,6 +21,7 @@ import {
 import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal"
 import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave"
 import { useProjectActions } from "@/hooks/use-project-actions"
+import type { CanvasSnapshot } from "@/types/canvas"
 import type { EditorProject } from "@/types/projects"
 
 interface WorkspaceProject {
@@ -46,6 +47,10 @@ export function WorkspaceShell({
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
   const [templateImport, setTemplateImport] =
     useState<CanvasTemplateImport | null>(null)
+  const [canvasSnapshot, setCanvasSnapshot] = useState<CanvasSnapshot>({
+    edges: [],
+    nodes: [],
+  })
   const [canvasSaveStatus, setCanvasSaveStatus] =
     useState<CanvasSaveStatus>("saved")
   const [canvasSaveNow, setCanvasSaveNow] = useState<(() => void) | null>(null)
@@ -143,12 +148,14 @@ export function WorkspaceShell({
             <CanvasRoom
               onSaveNowChange={handleSaveNowChange}
               onSaveStatusChange={setCanvasSaveStatus}
+              onSnapshotChange={setCanvasSnapshot}
               roomId={project.id}
               templateImport={templateImport}
             />
           </main>
 
           <AiSidebar
+            canvasSnapshot={canvasSnapshot}
             isOpen={isAiSidebarOpen}
             onClose={() => setIsAiSidebarOpen(false)}
             roomId={project.id}
