@@ -75,6 +75,17 @@ export function getAiChatFeedMessages(
     .sort((first, second) => first.createdAt - second.createdAt)
 }
 
+export function mergeAiChatMessages(
+  saved: AiChatFeedMessage[],
+  pending: AiChatFeedMessage[]
+): AiChatFeedMessage[] {
+  const byId = new Map(saved.map((message) => [message.id, message]))
+  for (const message of pending) {
+    if (!byId.has(message.id)) byId.set(message.id, message)
+  }
+  return [...byId.values()].sort((first, second) => first.createdAt - second.createdAt)
+}
+
 export function readAiStatusFeedPayload(
   value: unknown
 ): AiStatusFeedPayload | null {

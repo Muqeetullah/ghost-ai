@@ -1,4 +1,4 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { getGenerationModel } from "@/lib/ai-model"
 import { generateText } from "ai"
 import { logger, metadata, task } from "@trigger.dev/sdk"
 
@@ -126,9 +126,8 @@ async function generateMarkdownSpec(
   payload: SpecGenerationTaskPayload,
   project: SpecProjectContext
 ) {
-  const google = getGoogleProvider()
   const result = await generateText({
-    model: google("gemini-2.5-flash-lite"),
+    model: getGenerationModel(),
     maxOutputTokens: 1800,
     maxRetries: 0,
     timeout: {
@@ -137,7 +136,7 @@ async function generateMarkdownSpec(
     providerOptions: {
       google: {
         thinkingConfig: {
-          thinkingBudget: 0,
+          thinkingLevel: "low",
         },
       },
     },
@@ -235,16 +234,6 @@ function serializeChatMessage(message: SpecChatMessage) {
 
 function projectNodeHasMeaningfulPosition(node: SpecCanvasNodeInput) {
   return Number.isFinite(node.position.x) && Number.isFinite(node.position.y)
-}
-
-function getGoogleProvider() {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
-
-  if (!apiKey) {
-    throw new Error("GOOGLE_AI_API_KEY is required")
-  }
-
-  return createGoogleGenerativeAI({ apiKey })
 }
 
 function readFirstMarkdownHeading(markdown: string) {

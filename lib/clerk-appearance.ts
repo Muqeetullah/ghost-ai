@@ -122,3 +122,44 @@ export const clerkUserButtonAppearance = {
     },
   },
 } as const
+
+// Auth page refinements stay separate from account menus and profile modals.
+export const clerkAuthAppearance = {
+  ...clerkAppearance,
+  elements: {
+    ...clerkAppearance.elements,
+    cardBox: {
+      width: "100%",
+      boxShadow: "none",
+      borderRadius: "1rem",
+      overflow: "hidden",
+      border: "1px solid var(--border-default)",
+    },
+    card: {
+      backgroundColor: "var(--bg-surface)",
+      border: "none",
+      boxShadow: "none",
+      padding: "clamp(1.25rem, 4vw, 2rem)",
+      borderRadius: "0",
+    },
+    headerTitle: {
+      ...clerkAppearance.elements.headerTitle,
+      fontSize: "1.5rem",
+      letterSpacing: "-0.04em",
+    },
+    formFieldInput: {
+      ...clerkAppearance.elements.formFieldInput,
+      borderRadius: "0.75rem",
+    },
+    formButtonPrimary: {
+      ...clerkAppearance.elements.formButtonPrimary,
+      backgroundColor: "var(--accent-primary)",
+      backgroundImage: "none",
+      borderRadius: "0.75rem",
+    },
+    socialButtonsBlockButton: {
+      ...clerkAppearance.elements.socialButtonsBlockButton,
+      borderRadius: "0.75rem",
+    },
+  },
+} as const

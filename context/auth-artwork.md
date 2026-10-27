@@ -1,0 +1,7 @@
+# Auth artwork
+
+Generated with the built in image generation tool using the user's initial screenshot as a style and composition reference. Final asset: `public/images/auth-horizon.png`.
+
+## Generation prompt
+
+Use case: stylized-concept. Create a premium portrait 2:3 background artwork for Ghost AI, a collaborative system architecture design app. The supplied screenshot is a STYLE AND COMPOSITION REFERENCE only: take inspiration from its atmospheric grain, abstract rounded horizon, luminous upper area, and near-black spacious lower region. Output ONLY the new artwork, not a website or screenshot. A monumental dark sculptural torus / curved horizon emerging from soft midnight mist, fine film grain, delicate cyan rim light with restrained indigo-violet reflections. Subtle luminous particulate field in the upper background suggests ideas resolving into structure, organic and atmospheric rather than a literal diagram. Rich charcoal black, icy cyan, midnight indigo, soft silver. Premium experimental editorial 3D art with tactile soft grain. Upper 60 percent contains sculptural form and light, bottom 40 percent stays very dark and calm for white text to be overlaid later in HTML. Edge to edge artwork. No text, letters, numbers, UI, logos, characters, cartoon stickers, diagrams, nodes, or watermarks. Preserve subtle tonal detail, avoid bright white background or neon cyberpunk clutter.

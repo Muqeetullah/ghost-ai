@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { getGenerationModel } from "@/lib/ai-model"
 import { Liveblocks } from "@liveblocks/node"
 import { mutateFlow, type MutableFlow } from "@liveblocks/react-flow/node"
 import { AbortTaskRunError, logger, metadata, task } from "@trigger.dev/sdk"
@@ -665,9 +665,11 @@ async function generateDesignPlan(
   project: DesignAgentProjectContext,
   snapshot: CanvasSnapshot
 ): Promise<DesignAgentPlan> {
-  const google = getGoogleProvider()
   const result = await generateText({
-    model: google("gemini-2.5-flash"),
+    model: getGenerationModel(),
+    maxRetries: 0,
+    timeout: { totalMs: 60_000 },
+    providerOptions: { google: { thinkingConfig: { thinkingLevel: "low" } } },
     tools: designAgentTools,
     toolChoice: "required",
     stopWhen: stepCountIs(1),
@@ -696,16 +698,6 @@ async function generateDesignPlan(
     actions: completedActions,
     summary: summarizeDesignActions(completedActions, result.text),
   }
-}
-
-function getGoogleProvider() {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
-
-  if (!apiKey) {
-    throw new Error("GOOGLE_AI_API_KEY is required")
-  }
-
-  return createGoogleGenerativeAI({ apiKey })
 }
 
 function buildDesignAgentSystemPrompt() {

@@ -14,6 +14,7 @@ interface DesignRequestBody {
   prompt: string;
   projectId: string;
   roomId: string;
+  requestId?: string;
 }
 
 const MAX_PROMPT_LENGTH = 2000;
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
         projectId: project.id,
         prompt: body.prompt,
         roomId: body.roomId,
+        requestId: body.requestId,
       }),
     ],
     { scope: "global" }
@@ -148,7 +150,13 @@ async function parseDesignRequest(
     return jsonError("Room ID is required", 400);
   }
 
-  return { prompt, projectId, roomId };
+  const requestId = parseRequiredString(body.requestId);
+
+  if (body.requestId !== undefined && (!requestId || !/^[a-zA-Z0-9-]{1,128}$/.test(requestId))) {
+    return jsonError("Invalid request ID", 400);
+  }
+
+  return { prompt, projectId, roomId, ...(requestId ? { requestId } : {}) };
 }
 
 function parseRequiredString(value: unknown) {

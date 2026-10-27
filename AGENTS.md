@@ -17,6 +17,9 @@ Read the following files in order before implementing or making any architectura
 5. `context/ai-workflow-rules.md` — development workflow, scoping rules, and delivery approach
 6. `context/progress-tracker.md` — current phase, completed work, open questions, and next steps
 
+Current auth layout and profile placement are documented in `context/ui-context.md`; it records the approved updates to the initial auth and canvas-presence specs.
+Run `npm test` for the offline conversation and canvas regression suite. Local AI generation requires `npm run trigger:dev` alongside the Next.js server.
+
 Update `context/progress-tracker.md` after each meaningful implementation change.
 
 If implementation changes the architecture, scope, or standards documented in the context files, update the relevant file before continuing.

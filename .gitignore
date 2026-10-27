@@ -45,3 +45,6 @@ Thumbs.db
 
 # local scratch / issue notes (not for version control)
 context/current-issues/current-issues.md
+
+# generated demo recordings and editing artifacts
+/output/recordings/

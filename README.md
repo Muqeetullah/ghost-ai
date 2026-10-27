@@ -14,10 +14,6 @@
 
 Ghost AI turns natural-language architecture prompts into editable system design diagrams, keeps collaborators synchronized in real time, and generates polished Markdown technical specifications from the final canvas. It is built as a full-stack Next.js workspace with authenticated project management, Liveblocks-powered multiplayer state, durable Trigger.dev AI workflows, Prisma/PostgreSQL metadata, and Vercel Blob artifact storage.
 
-> Demo placeholder: add a short walkthrough GIF or video at `docs/media/ghost-ai-demo.mp4`.
->
-> Screenshot placeholders: add product images at `docs/images/editor-canvas.png`, `docs/images/ai-sidebar.png`, and `docs/images/generated-spec.png`.
-
 ## Product Value
 
 Ghost AI is designed for engineers, founders, and product teams who need to move quickly from a rough system idea to a concrete architecture artifact. Instead of keeping diagrams, AI chat, collaboration, and specs in separate tools, Ghost AI brings them into one shared workspace:
@@ -40,7 +36,7 @@ Ghost AI is designed for engineers, founders, and product teams who need to move
 | Database | Prisma 7, PostgreSQL, Prisma Accelerate/PG adapter | Project metadata, collaborators, task runs, and generated spec records. |
 | Realtime canvas | Liveblocks, React Flow, `@liveblocks/react-flow` | Shared canvas state, presence, cursors, and collaborative graph editing. |
 | Background jobs | Trigger.dev v4 | Durable AI design generation, spec generation, run metadata, and local worker tooling. |
-| AI | AI SDK, Google Gemini | Structured architecture planning and Markdown spec generation. |
+| AI | AI SDK, Gemini 3.5 Flash-Lite | Shared model for canvas tool calls and Markdown spec generation, configured in `lib/ai-model.ts`. |
 | Artifact storage | Vercel Blob | Private canvas snapshots and generated Markdown specs. |
 
 ## Architecture Overview
@@ -79,7 +75,9 @@ The application keeps responsibilities intentionally separated:
 
 ### Authenticated Project Workspace
 
-- Clerk-backed sign-in and protected editor routes.
+- Consistent dark sign-in and sign-up pages with a custom Ghost AI mark and local generated artwork.
+- Clerk-backed authentication and protected editor routes.
+- Profile access in the navbar, visible above the AI workspace.
 - Owned and shared project lists.
 - Project creation, rename, delete, and collaborator management.
 - Access checks enforced before every project mutation.
@@ -101,14 +99,19 @@ The application keeps responsibilities intentionally separated:
 
 - `POST /api/ai/design` validates access, creates an idempotent Trigger.dev run, and persists the run ID.
 - `trigger/design-agent.ts` reads project context, interprets the prompt, generates canvas actions, and applies them into the Liveblocks room.
-- AI activity is published back to the workspace through room events and status feeds.
+- Your prompts and the agent's responses appear in the AI Architect conversation and survive reloads.
+- New submissions carry request IDs so retrying a prompt does not reuse a canceled or expired run.
+- AI activity is published through room events and status feeds.
+- When browser feed subscriptions time out, a membership-checked HTTP fallback reads the same saved Liveblocks messages. Feed failures do not take down the canvas.
+- Design generation has a 60-second model deadline; spec generation has a 30-second deadline.
 
 ### AI Spec Generation
 
-- `POST /api/ai/spec` sends the current canvas snapshot and relevant chat history into a Trigger.dev workflow.
+- `POST /api/ai/spec` combines the current canvas snapshot with the saved conversation on the server before starting the Trigger.dev workflow.
 - `trigger/generate-spec.ts` generates a Markdown technical specification with Gemini Flash-Lite.
 - Specs are saved to private Vercel Blob storage and linked through Prisma metadata.
-- Authenticated users can preview and download generated specs.
+- Successful generation opens the latest preview automatically. Authenticated users can preview and download Markdown specs.
+- Preview text wraps on narrow screens, with wide tables scrolling inside their own containers.
 
 ## Key Technical Challenges Solved
 
@@ -116,9 +119,10 @@ The application keeps responsibilities intentionally separated:
 | --- | --- |
 | Keeping AI work out of request handlers | Long-running generation runs in Trigger.dev tasks, while API routes only validate, authorize, trigger, and persist metadata. |
 | Synchronizing AI and human edits | The design agent applies graph mutations directly to the Liveblocks-backed React Flow document, so generated changes appear in the same realtime state model as human edits. |
-| Preventing duplicate AI runs | Design generation uses Trigger.dev idempotency keys derived from project, user, room, and prompt hash. |
+| Preventing duplicate AI runs | Design generation uses Trigger.dev idempotency keys derived from project, user, room, prompt hash, and submission request ID. |
 | Protecting collaborative rooms | Liveblocks tokens are minted only after Clerk identity and project membership checks pass. |
 | Separating metadata from large artifacts | PostgreSQL stores ownership and references; Vercel Blob stores canvas snapshots and Markdown specs. |
+| Recovering from feed timeouts | An authenticated HTTP fallback reads the existing Liveblocks chat and status feeds while the browser subscription is loading or unavailable. |
 | Reducing slow AI spec runs | Spec prompts trim chat history, compress canvas context, use a bounded model output budget, and fail fast with an AI SDK timeout. |
 | Handling database connection modes | Runtime Prisma connections normalize direct Prisma Postgres URLs to pooled hosts while CLI workflows can use direct URLs for migrations. |
 
@@ -135,6 +139,7 @@ ghost-ai/
 |   `-- layout.tsx                   # Root app shell and providers
 |-- components/
 |   |-- auth/                        # Authentication layout composition
+|   |-- brand/                       # Shared Ghost AI logo
 |   |-- editor/                      # Canvas, sidebar, navbar, dialogs, workspace UI
 |   `-- ui/                          # shadcn/ui primitives
 |-- context/                         # Product and engineering context docs
@@ -145,6 +150,8 @@ ghost-ai/
 |   |-- migrations/                  # Database migrations
 |   |-- models/                      # Prisma model definitions
 |   `-- schema.prisma                # Prisma schema entry
+|-- public/images/                   # Local authentication artwork
+|-- tests/                           # Conversation and canvas regression tests
 |-- trigger/                         # Trigger.dev v4 tasks
 |-- types/                           # Shared TypeScript contracts
 |-- liveblocks.config.ts             # Liveblocks type augmentation
@@ -156,7 +163,7 @@ ghost-ai/
 
 ### Prerequisites
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - npm
 - PostgreSQL or Prisma Postgres
 - Clerk application
@@ -168,7 +175,7 @@ ghost-ai/
 ### Installation
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/Muqeetullah/ghost-ai.git
 cd ghost-ai
 npm install
 ```
@@ -179,13 +186,13 @@ Create a local environment file:
 touch .env.local
 ```
 
-Populate `.env.local` using the environment variable table below. If your branch includes an `.env.example`, you can copy that file instead.
+Populate `.env.local` using the environment variable table below. Never commit API keys or database credentials.
 
-Generate the Prisma client and apply migrations:
+Generate the Prisma client and apply migrations. The Prisma CLI uses `dotenv/config`, so point it at the same local environment file:
 
 ```bash
-npx prisma generate
-npx prisma migrate deploy
+DOTENV_CONFIG_PATH=.env.local npx prisma generate
+DOTENV_CONFIG_PATH=.env.local npx prisma migrate deploy
 ```
 
 Start the Next.js app:
@@ -200,7 +207,15 @@ Start the Trigger.dev worker in a second terminal:
 npm run trigger:dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). Both processes must stay running for local AI generation. A running Next.js server alone can queue tasks, but it cannot execute the AI worker.
+
+To use port 3100 instead:
+
+```bash
+npm run dev -- --port 3100
+```
+
+The Gemini model is pinned in `lib/ai-model.ts`. A model with a free tier still requires a Google API project on the Free tier to avoid inference charges, and quotas apply. The app does not enable billing or automatically switch to a paid model.
 
 ## Environment Variables
 
@@ -218,7 +233,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `LIVEBLOCKS_SECRET_KEY` | Yes | Server key for room creation, auth token issuance, presence, and room mutation. |
 | `TRIGGER_PROJECT_REF` | Yes | Trigger.dev project reference used by `trigger.config.ts`. |
 | `TRIGGER_SECRET_KEY` | Yes | Trigger.dev secret key for local and deployed workers. |
-| `GOOGLE_AI_API_KEY` | Yes | Google AI API key used by design and spec generation tasks. |
+| `GOOGLE_AI_API_KEY` | Yes | Google AI API key for Gemini 3.5 Flash-Lite design and spec generation. Use a Free tier API project to avoid inference charges; free quotas apply. |
 | `BLOB_READ_WRITE_TOKEN` | Yes | Vercel Blob read/write token for private canvas and spec artifacts. |
 
 Example database configuration for Prisma Postgres:
@@ -236,6 +251,7 @@ DIRECT_URL="postgres://USER:PASSWORD@db.prisma.io:5432/postgres?sslmode=require"
 | `npm run build` | Create a production build. |
 | `npm run start` | Run the production server after a build. |
 | `npm run lint` | Run ESLint. |
+| `npm test` | Run conversation, spec-context, and canvas feed-failure regression tests without network access. |
 | `npm run trigger:dev` | Start the Trigger.dev local worker with `.env.local`. |
 | `npm run trigger:deploy` | Deploy Trigger.dev tasks. |
 | `npx prisma generate` | Generate the Prisma client in `generated/prisma`. |
@@ -253,6 +269,7 @@ DIRECT_URL="postgres://USER:PASSWORD@db.prisma.io:5432/postgres?sslmode=require"
 | `/api/projects/[projectId]/collaborators` | `POST` | Invite a collaborator by email. |
 | `/api/projects/[projectId]/collaborators/[collaboratorId]` | `DELETE` | Remove a collaborator. |
 | `/api/liveblocks-auth` | `POST` | Verify project access and issue a Liveblocks room token. |
+| `/api/projects/[projectId]/ai-feed` | `GET` | Read an allowed AI chat or status feed after checking project membership. |
 | `/api/projects/[projectId]/canvas` | `GET` | Load the saved canvas snapshot from Vercel Blob. |
 | `/api/projects/[projectId]/canvas` | `PUT` | Persist the latest canvas snapshot to Vercel Blob. |
 | `/api/ai/design` | `POST` | Trigger the durable AI design-agent workflow. |
@@ -280,7 +297,7 @@ Canvas nodes, edges, and generated Markdown content are not stored directly in r
 
 - Server Component-first routing keeps client JavaScript scoped to interactive editor surfaces.
 - Debounced canvas autosave limits artifact writes while preserving explicit manual save controls.
-- Liveblocks stores collaborative graph state and presence without polling.
+- Liveblocks synchronizes collaborative graph state and presence in real time. AI feed reads fall back to polling every three seconds only while the browser subscription is loading or has failed.
 - Trigger.dev moves AI generation out of request-response latency paths.
 - Spec generation trims chat history, filters repetitive assistant status messages, limits prompt size, and caps model output.
 - Prisma client is cached in development to avoid connection churn during hot reloads.
@@ -324,6 +341,15 @@ Trigger.dev production and staging schedules/runs execute against the latest dep
 - Vercel Blob token is available in the deployment environment.
 - Database migrations are deployed before routing production traffic.
 
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| AI request stays queued or expires | Keep `npm run trigger:dev` running alongside Next.js. Confirm the worker reports ready and uses the same Trigger.dev project and environment as the app. |
+| AI generation times out or hits quota | Check the run error in Trigger.dev and the Gemini project's quota. Ensure `GOOGLE_AI_API_KEY` is available to the worker. |
+| Conversation or AI status is unavailable | The HTTP fallback reads saved messages automatically. If it also fails, check `LIVEBLOCKS_SECRET_KEY`, project membership, and the `/ai-feed` response. |
+| Generated spec cannot be previewed or downloaded | Check the Trigger.dev run, database connectivity, and `BLOB_READ_WRITE_TOKEN` in both the app and worker environments. |
+
 ## Future Improvements
 
 - Role-based permissions beyond owner and collaborator.
@@ -347,6 +373,7 @@ Contributions should preserve the system boundaries documented in `context/archi
 
 ```bash
 npm run lint
+npm test
 npx tsc --noEmit
 npm run build
 ```

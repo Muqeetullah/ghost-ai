@@ -12,7 +12,6 @@ import { shallow } from "@liveblocks/client"
 import {
   useCreateFeed,
   useCreateFeedMessage,
-  useFeedMessages,
   useOthers,
   useSelf,
 } from "@liveblocks/react"
@@ -34,6 +33,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { useAiFeedMessages } from "@/hooks/use-ai-feed-messages"
 import type { CanvasSnapshot } from "@/types/canvas"
 import type { generateSpec } from "@/trigger/generate-spec"
 import type { designAgent } from "@/trigger/design-agent"
@@ -41,7 +41,9 @@ import {
   AI_CHAT_FEED_ID,
   AI_STATUS_FEED_ID,
   type AiChatFeedPayload,
+  type AiChatFeedMessage,
   getAiChatFeedMessages,
+  mergeAiChatMessages,
   getLatestAiStatusFeedPayload,
 } from "@/types/tasks"
 
@@ -85,6 +87,7 @@ export function AiSidebar({
 }: AiSidebarProps) {
   const [activeTab, setActiveTab] = useState("architect")
   const [prompt, setPrompt] = useState("")
+  const [pendingMessages, setPendingMessages] = useState<(AiChatFeedMessage & { roomId: string })[]>([])
   const [sendError, setSendError] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [activeRun, setActiveRun] = useState<ActiveRunState | null>(null)
@@ -116,16 +119,17 @@ export function AiSidebar({
   const hasLoadedSpecsRef = useRef(false)
   const createFeed = useCreateFeed()
   const createFeedMessage = useCreateFeedMessage()
-  const chatFeed = useFeedMessages(AI_CHAT_FEED_ID)
-  const statusFeed = useFeedMessages(AI_STATUS_FEED_ID)
+  const chatFeed = useAiFeedMessages(AI_CHAT_FEED_ID)
+  const statusFeed = useAiFeedMessages(AI_STATUS_FEED_ID)
   const senderName = useSelf((me) => me.info.name)
   const isRemoteAiThinking = useOthers(
     (others) => others.some((other) => other.presence.thinking === true),
     shallow
   )
   const chatMessages = useMemo(() => {
-    return getAiChatFeedMessages(chatFeed.messages ?? [])
-  }, [chatFeed])
+    const saved = getAiChatFeedMessages(chatFeed.messages ?? [])
+    return mergeAiChatMessages(saved, pendingMessages.filter((message) => message.roomId === roomId))
+  }, [chatFeed.messages, pendingMessages, roomId])
   const latestStatus = useMemo(() => {
     return getLatestAiStatusFeedPayload(statusFeed.messages ?? [])
   }, [statusFeed])
@@ -273,8 +277,11 @@ export function AiSidebar({
 
   const pushAiChatMessage = useCallback(
     async (message: AiChatFeedPayload) => {
+      const id = crypto.randomUUID()
+      const createdAt = Date.now()
+      setPendingMessages((current) => [...current, { ...message, id, createdAt, roomId }])
       try {
-        await createFeedMessage(AI_CHAT_FEED_ID, message)
+        await createFeedMessage(AI_CHAT_FEED_ID, message, { id, createdAt })
       } catch (error) {
         const messageText =
           error instanceof Error
@@ -284,7 +291,7 @@ export function AiSidebar({
         setSendError(messageText)
       }
     },
-    [createFeedMessage]
+    [createFeedMessage, roomId]
   )
 
   useEffect(() => {
@@ -454,7 +461,7 @@ export function AiSidebar({
         type: "ai-chat",
       }
 
-      await createFeedMessage(AI_CHAT_FEED_ID, message)
+      await pushAiChatMessage(message)
       setPrompt("")
       requestAnimationFrame(() => {
         if (textareaRef.current) {
@@ -601,7 +608,7 @@ export function AiSidebar({
             />
           )}
           <span className="min-w-0 truncate">
-            {latestStatus?.text ?? (isAiWorking ? "Ghost AI is working" : "Ghost AI is ready")}
+            {statusFeed.error ? "AI activity is unavailable" : latestStatus?.text ?? (isAiWorking ? "Ghost AI is working" : "Ghost AI is ready")}
           </span>
         </div>
 
@@ -636,7 +643,7 @@ export function AiSidebar({
                     <Bot className="h-6 w-6" />
                   </div>
                   <p className="mt-4 text-sm font-medium text-copy-primary">
-                    Start the room chat.
+                    {chatFeed.isLoading ? "Loading conversation..." : chatFeed.error ? "Could not load conversation" : "Start the room chat."}
                   </p>
                   <p className="mt-2 max-w-64 text-sm leading-6 text-copy-muted">
                     Share prompts, decisions, and architecture notes with
@@ -884,8 +891,8 @@ export function AiSidebar({
           setSelectedSpecError(null)
         }}
       >
-        <DialogContent className="h-[min(85vh,52rem)] w-[min(92vw,64rem)] max-w-[min(92vw,64rem)] gap-0 overflow-hidden rounded-3xl border border-surface-border bg-bg-elevated p-0 text-copy-primary shadow-2xl ring-0 sm:max-w-[min(92vw,64rem)]">
-          <DialogHeader className="border-b border-surface-border px-6 py-5 pr-14">
+        <DialogContent className="flex min-w-0 flex-col h-[min(85vh,52rem)] w-[min(92vw,64rem)] max-w-[min(92vw,64rem)] gap-0 overflow-hidden rounded-3xl border border-surface-border bg-bg-elevated p-0 text-copy-primary shadow-2xl ring-0 sm:max-w-[min(92vw,64rem)]">
+          <DialogHeader className="min-w-0 shrink-0 border-b border-surface-border px-6 py-5 pr-14">
             <DialogTitle className="break-all pr-2 text-lg leading-tight font-semibold text-copy-primary">
               {selectedSpec?.filename ?? "Spec preview"}
             </DialogTitle>
@@ -896,7 +903,7 @@ export function AiSidebar({
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="min-h-0 flex-1">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="px-6 py-5">
               {isSelectedSpecLoading ? (
                 <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
@@ -910,7 +917,7 @@ export function AiSidebar({
                   {selectedSpecError}
                 </div>
               ) : selectedSpecContent ? (
-                <div className="mx-auto w-full max-w-3xl space-y-4">
+                <div className="mx-auto w-full min-w-0 max-w-3xl space-y-4 [overflow-wrap:anywhere]">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -987,7 +994,7 @@ export function AiSidebar({
                         <pre {...props} className="my-4 overflow-x-auto" />
                       ),
                       table: ({ ...props }) => (
-                        <div className="overflow-x-auto">
+                        <div className="max-w-full overflow-x-auto">
                           <table
                             {...props}
                             className="min-w-full border-collapse text-sm"
@@ -1016,9 +1023,9 @@ export function AiSidebar({
                 </div>
               ) : null}
             </div>
-          </ScrollArea>
+          </div>
 
-          <DialogFooter className="border-surface-border bg-bg-base/80" showCloseButton>
+          <DialogFooter className="shrink-0 border-surface-border bg-bg-base/80" showCloseButton>
             <Button
               type="button"
               onClick={() => {
@@ -1050,6 +1057,7 @@ async function startDesignRun({
       projectId: roomId,
       prompt,
       roomId,
+      requestId: crypto.randomUUID(),
     }),
     headers: {
       "Content-Type": "application/json",

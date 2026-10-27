@@ -1,29 +1,22 @@
 import type { ReactNode } from "react"
-import { Braces } from "lucide-react"
+import Image from "next/image"
+import { FileText, GitBranch, LockKeyhole, Sparkles } from "lucide-react"
+
+import { GhostLogo } from "@/components/brand/ghost-logo"
 
 interface AuthShellProps {
   children: ReactNode
   mode: "sign-in" | "sign-up"
 }
 
-const featureList = [
-  "Map services, storage, queues, and boundaries on a shared canvas.",
-  "Invite collaborators into the same architecture workspace.",
-  "Turn the final graph into a durable technical spec.",
-]
-
 const authCopy = {
   "sign-in": {
-    eyebrow: "Welcome back",
-    heading: "Continue designing systems with Ghost AI.",
-    summary:
-      "Your protected projects, collaborative canvases, and generated specs are ready when you are.",
+    heading: "Your next big idea.\nA clearer architecture.",
+    summary: "Pick up where you left off. Shape systems together, from the first connection to the final spec.",
   },
   "sign-up": {
-    eyebrow: "Create your workspace",
-    heading: "Start a cleaner system design workflow.",
-    summary:
-      "Set up your account to create projects, collaborate on architecture, and generate implementation-ready specs.",
+    heading: "From a spark of an idea\nto a system that works.",
+    summary: "A shared canvas for your architecture. Explore ideas with AI, build with your team, and bring every decision into focus.",
   },
 }
 
@@ -31,58 +24,40 @@ export function AuthShell({ children, mode }: AuthShellProps) {
   const copy = authCopy[mode]
 
   return (
-    <main className="grid min-h-screen bg-base text-copy-primary lg:grid-cols-[minmax(0,0.9fr)_minmax(30rem,1fr)]">
-      <section className="hidden border-r border-surface-border bg-surface px-10 py-10 lg:flex lg:flex-col lg:justify-between xl:px-14">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-bg-elevated text-brand">
-              <Braces className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-copy-primary">Ghost AI</p>
-              <p className="text-xs text-copy-muted">System design workspace</p>
-            </div>
-          </div>
+    <main className="grid min-h-svh bg-bg-base text-copy-primary lg:grid-cols-2">
+      <section aria-label="Your Ghost AI account" className="flex min-w-0 flex-col px-6 py-8 sm:px-10 lg:px-12 lg:py-10 xl:px-16">
+        <GhostLogo />
+
+        <div className="flex flex-1 items-center justify-center py-12 lg:py-10">
+          <div className="w-full max-w-[25rem]">{children}</div>
         </div>
 
-        <div className="max-w-lg">
-          <p className="text-sm font-medium text-brand">{copy.eyebrow}</p>
-          <h1 className="mt-5 text-4xl font-semibold leading-tight tracking-normal text-copy-primary">
-            {copy.heading}
-          </h1>
-          <p className="mt-4 max-w-md text-sm leading-6 text-copy-secondary">
-            {copy.summary}
-          </p>
-
-          <ul className="mt-10 space-y-3 text-sm leading-6 text-copy-secondary">
-            {featureList.map((feature) => (
-              <li key={feature} className="flex gap-3">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
-                <span>{feature}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="max-w-sm text-xs leading-5 text-copy-muted">
-          Protected sign-in keeps project ownership, collaborator access, and generated artifacts tied to the right workspace.
+        <p className="flex items-center justify-center gap-2 text-xs leading-5 text-copy-muted lg:justify-start">
+          <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+          Your ideas. Your team. Your workspace.
         </p>
       </section>
 
-      <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
-        <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-bg-elevated text-brand">
-              <Braces className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-copy-primary">Ghost AI</p>
-              <p className="text-xs text-copy-muted">System design workspace</p>
-            </div>
-          </div>
-          {children}
+      <aside aria-label="Design systems with Ghost AI" className="relative m-4 ml-0 hidden min-h-[44rem] min-w-0 flex-col justify-end overflow-hidden rounded-3xl border border-surface-border bg-bg-base p-8 lg:flex xl:p-12">
+        <Image
+          src="/images/auth-horizon.png"
+          alt=""
+          fill
+          sizes="50vw"
+          preload
+          className="object-cover"
+        />
+        <div className="relative z-10 mx-auto w-full max-w-xl pb-4 pt-80">
+          <p className="mb-4 flex items-center gap-2 text-xs font-medium text-brand"><Sparkles aria-hidden="true" className="h-4 w-4" />Think it. Map it. Build it.</p>
+          <h1 className="whitespace-pre-line text-3xl font-medium leading-tight tracking-tight xl:text-4xl">{copy.heading}</h1>
+          <p className="mt-4 max-w-md text-sm leading-6 text-copy-secondary">{copy.summary}</p>
+          <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-3 border-t border-copy-primary/20 pt-5 text-xs text-copy-secondary">
+            <li className="flex items-center gap-2"><GitBranch aria-hidden="true" className="h-4 w-4 text-brand" />Shared canvas</li>
+            <li className="flex items-center gap-2"><Sparkles aria-hidden="true" className="h-4 w-4 text-ai-text" />AI architect</li>
+            <li className="flex items-center gap-2"><FileText aria-hidden="true" className="h-4 w-4 text-copy-muted" />Technical specs</li>
+          </ul>
         </div>
-      </section>
+      </aside>
     </main>
   )
 }

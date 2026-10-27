@@ -73,7 +73,6 @@ export function WorkspaceShell({
       <EditorNavbar
         isSidebarOpen={isProjectSidebarOpen}
         onSidebarToggle={() => setIsProjectSidebarOpen((isOpen) => !isOpen)}
-        showUserButton={false}
         centerContent={
           <div className="min-w-0 text-center">
             <p className="truncate text-sm font-semibold text-copy-primary">

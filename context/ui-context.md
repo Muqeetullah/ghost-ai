@@ -103,3 +103,19 @@ shadcn/ui on top of Tailwind. No custom design system. Components live in `compo
 ## Icons
 
 Lucide React. Stroke-based icons only — no filled variants. Icon sizes: `h-4 w-4` for inline, `h-5 w-5` for buttons, `h-8 w-8` for feature icons in empty states.
+
+## Authentication pages
+
+Sign in and sign up share a responsive shell. Desktop places the brand and centered Clerk form on the left and an inset generated artwork panel with product copy overlaid on the right. Small screens show the brand and form only. The local raster artwork at `public/images/auth-horizon.png` uses a grainy dark sculptural horizon with cyan and indigo light, inspired by the supplied visual reference. Copy is accessible HTML over the dark lower portion, and the image is decorative. It is loaded through Next Image. Form appearance overrides are isolated from the account menu and profile modal.
+
+## Brand mark
+
+The auth header uses `components/brand/ghost-logo.tsx`, a custom cyan outline ghost with angular trailing edges and detached diagonal signals. The lowercase Geist wordmark pairs primary text with a muted `ai` suffix. Keep the mark as native SVG for crisp rendering.
+
+## Profile access
+
+The current user Clerk profile button lives in the right side of the navbar on both editor home and project workspaces. Canvas presence shows collaborators only and is hidden when no collaborators are present. The profile control stays above the AI sidebar.
+
+## AI conversation and spec preview
+
+The AI chat displays submitted messages immediately and merges them by stable ID with persisted feed history. Loading and failed history reads are distinct from an empty conversation. Spec previews use a bounded flex dialog with a vertical scroll region; headings and body copy wrap within the viewport while tables scroll horizontally in their own container.

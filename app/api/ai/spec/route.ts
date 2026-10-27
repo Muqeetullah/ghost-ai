@@ -2,6 +2,8 @@ import { tasks } from "@trigger.dev/sdk";
 
 import { jsonError } from "@/app/api/projects/_lib/project-api";
 import { prisma } from "@/lib/prisma";
+import { getLiveblocksClient } from "@/lib/liveblocks";
+import { AI_CHAT_FEED_ID, getAiChatFeedMessages } from "@/types/tasks";
 import { getAccessibleProject, getCurrentClerkIdentity } from "@/lib/project-access";
 import {
   normalizeSpecChatHistory,
@@ -31,7 +33,25 @@ export async function POST(request: Request) {
     return jsonError("Forbidden", 403);
   }
 
-  const normalizedChatHistory = normalizeSpecChatHistory(body.chatHistory);
+  // Load the authoritative history even when the browser feed subscription failed.
+  let chatHistory = body.chatHistory;
+  try {
+    const { data } = await getLiveblocksClient().getFeedMessages({
+      roomId: project.id,
+      feedId: AI_CHAT_FEED_ID,
+    });
+    const savedMessages = getAiChatFeedMessages(data);
+    const combined = new Map(chatHistory.map((message) => [
+      JSON.stringify([message.role, message.timestamp, message.content]), message,
+    ]));
+    for (const message of savedMessages) {
+      combined.set(JSON.stringify([message.role, message.timestamp, message.content]), message);
+    }
+    chatHistory = [...combined.values()].sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? ""));
+  } catch {
+    return jsonError("Could not load the conversation for spec generation. Please try again.", 502);
+  }
+  const normalizedChatHistory = normalizeSpecChatHistory(chatHistory);
 
   const handle = await tasks.trigger<typeof generateSpec>("generate-spec", {
     chatHistory: normalizedChatHistory,
